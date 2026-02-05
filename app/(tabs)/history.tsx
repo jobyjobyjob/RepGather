@@ -1,0 +1,316 @@
+import React from 'react';
+import { StyleSheet, Text, View, ScrollView, useColorScheme, Platform, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { format, parseISO, startOfWeek, eachDayOfInterval, subDays } from 'date-fns';
+
+import Colors from '@/constants/colors';
+import { usePushups } from '@/contexts/PushupContext';
+
+export default function HistoryScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const colors = isDark ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+
+  const { isLoading, goal, logs, progress } = usePushups();
+
+  if (isLoading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </View>
+    );
+  }
+
+  if (!goal) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.emptyState, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) }]}>
+          <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+            Start a challenge to see your history
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const last7Days = eachDayOfInterval({
+    start: subDays(new Date(), 6),
+    end: new Date(),
+  });
+
+  const getLogForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return logs.find(log => log.date === dateStr);
+  };
+
+  const sortedLogs = [...logs].sort((a, b) => 
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { 
+            paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 16),
+            paddingBottom: Platform.OS === 'web' ? 118 : 100,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+          Your Progress
+        </Text>
+
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: colors.tint, fontFamily: 'Inter_700Bold' }]}>
+                {progress?.totalCompleted.toLocaleString() || 0}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Total Push-ups
+              </Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: colors.accent, fontFamily: 'Inter_700Bold' }]}>
+                {logs.length}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Days Active
+              </Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: colors.success, fontFamily: 'Inter_700Bold' }]}>
+                {progress?.streak || 0}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Day Streak
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Last 7 Days
+          </Text>
+          <View style={[styles.weekCard, { backgroundColor: colors.card }]}>
+            <View style={styles.weekRow}>
+              {last7Days.map((date, index) => {
+                const log = getLogForDate(date);
+                const hasActivity = log && log.count > 0;
+                const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                
+                return (
+                  <View key={index} style={styles.dayColumn}>
+                    <Text style={[styles.dayLabel, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+                      {format(date, 'EEE')}
+                    </Text>
+                    <View
+                      style={[
+                        styles.dayCircle,
+                        {
+                          backgroundColor: hasActivity ? colors.tint : colors.progressBackground,
+                          borderWidth: isToday ? 2 : 0,
+                          borderColor: colors.tint,
+                        },
+                      ]}
+                    >
+                      {hasActivity && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <Text style={[styles.dayCount, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                      {log?.count || 0}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Activity Log
+          </Text>
+          {sortedLogs.length === 0 ? (
+            <View style={[styles.emptyLog, { backgroundColor: colors.card }]}>
+              <Text style={[styles.emptyLogText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                No activity yet. Start logging your push-ups!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.logList}>
+              {sortedLogs.map((log) => (
+                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.card }]}>
+                  <View style={styles.logDate}>
+                    <Text style={[styles.logDay, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                      {format(parseISO(log.date), 'd')}
+                    </Text>
+                    <Text style={[styles.logMonth, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                      {format(parseISO(log.date), 'MMM')}
+                    </Text>
+                  </View>
+                  <View style={styles.logContent}>
+                    <Text style={[styles.logCount, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                      {log.count} push-ups
+                    </Text>
+                    <Text style={[styles.logTime, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                      {format(parseISO(log.date), 'EEEE')}
+                    </Text>
+                  </View>
+                  <View style={[styles.logIcon, { backgroundColor: colors.tint + '20' }]}>
+                    <Ionicons name="fitness" size={20} color={colors.tint} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    gap: 24,
+  },
+  title: {
+    fontSize: 28,
+  },
+  summaryCard: {
+    padding: 20,
+    borderRadius: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  summaryValue: {
+    fontSize: 28,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  divider: {
+    width: 1,
+    height: 40,
+  },
+  section: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+  },
+  weekCard: {
+    padding: 20,
+    borderRadius: 20,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayColumn: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  dayLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  dayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCount: {
+    fontSize: 14,
+  },
+  emptyLog: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  emptyLogText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  logList: {
+    gap: 12,
+  },
+  logItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 16,
+  },
+  logDate: {
+    alignItems: 'center',
+    width: 44,
+  },
+  logDay: {
+    fontSize: 20,
+  },
+  logMonth: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  logContent: {
+    flex: 1,
+    gap: 2,
+  },
+  logCount: {
+    fontSize: 16,
+  },
+  logTime: {
+    fontSize: 14,
+  },
+  logIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});
