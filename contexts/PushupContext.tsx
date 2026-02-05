@@ -6,7 +6,8 @@ interface ProgressData {
   totalCompleted: number;
   percentComplete: number;
   daysRemaining: number;
-  dailyTarget: number;
+  dynamicDailyTarget: number;
+  planDailyTarget: number;
   todayCount: number;
   streak: number;
 }

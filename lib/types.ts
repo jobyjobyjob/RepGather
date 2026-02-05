@@ -1,8 +1,12 @@
+export type PlanType = 'average' | 'increasing' | 'custom';
+
 export interface PushupGoal {
   id: string;
   totalGoal: number;
   startDate: string;
   endDate: string;
+  planType: PlanType;
+  customDailyTarget?: number;
   createdAt: string;
 }
 

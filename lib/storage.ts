@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, DailyLog, PushupGoal, ReminderSettings, generateId, getTodayDateString } from './types';
+import { AppData, DailyLog, PushupGoal, ReminderSettings, generateId, getTodayDateString, PlanType } from './types';
+import { differenceInDays, parseISO, eachDayOfInterval, getISOWeek, startOfDay } from 'date-fns';
 
 const STORAGE_KEY = 'pushup_pro_data';
 
@@ -113,22 +114,91 @@ export async function resetChallenge(): Promise<void> {
   await saveAppData(defaultData);
 }
 
-export function calculateDailyTarget(goal: PushupGoal, totalCompleted: number): number {
-  const now = new Date();
-  const end = new Date(goal.endDate);
+export function calculateDynamicDailyTarget(
+  goal: PushupGoal, 
+  logs: DailyLog[],
+  forDate?: string
+): number {
+  const targetDate = forDate ? parseISO(forDate) : new Date();
+  const endDate = parseISO(goal.endDate);
+  
+  const totalCompleted = logs.reduce((sum, log) => sum + log.count, 0);
   const remaining = goal.totalGoal - totalCompleted;
   
   if (remaining <= 0) return 0;
   
-  const daysLeft = Math.max(1, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  const today = startOfDay(new Date());
+  const target = startOfDay(targetDate);
+  const end = startOfDay(endDate);
+  
+  const daysLeft = Math.max(1, differenceInDays(end, today) + 1);
+  
   return Math.ceil(remaining / daysLeft);
+}
+
+export function calculatePlanTarget(
+  goal: PushupGoal,
+  forDate?: string
+): number {
+  const targetDate = forDate ? parseISO(forDate) : new Date();
+  const startDate = parseISO(goal.startDate);
+  const endDate = parseISO(goal.endDate);
+  
+  const totalDays = differenceInDays(endDate, startDate) + 1;
+  
+  if (goal.planType === 'custom' && goal.customDailyTarget) {
+    return goal.customDailyTarget;
+  }
+  
+  if (goal.planType === 'average') {
+    return Math.ceil(goal.totalGoal / totalDays);
+  }
+  
+  if (goal.planType === 'increasing') {
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+    const weekNumbers: number[] = [];
+    
+    allDays.forEach(day => {
+      const weekNum = getISOWeek(day);
+      if (!weekNumbers.includes(weekNum)) {
+        weekNumbers.push(weekNum);
+      }
+    });
+    
+    const numWeeks = weekNumbers.length;
+    const dayIndex = differenceInDays(targetDate, startDate);
+    const dayWeekNum = getISOWeek(targetDate);
+    const currentWeekIndex = weekNumbers.indexOf(dayWeekNum);
+    
+    if (currentWeekIndex === -1 || dayIndex < 0 || dayIndex >= totalDays) {
+      return Math.ceil(goal.totalGoal / totalDays);
+    }
+    
+    const weeklyMultipliers: number[] = [];
+    let totalWeight = 0;
+    for (let i = 0; i < numWeeks; i++) {
+      const multiplier = 1 + (i * 0.5);
+      weeklyMultipliers.push(multiplier);
+      
+      const daysInThisWeek = allDays.filter(d => getISOWeek(d) === weekNumbers[i]).length;
+      totalWeight += multiplier * daysInThisWeek;
+    }
+    
+    const basePerDay = goal.totalGoal / totalWeight;
+    const currentMultiplier = weeklyMultipliers[currentWeekIndex];
+    
+    return Math.ceil(basePerDay * currentMultiplier);
+  }
+  
+  return Math.ceil(goal.totalGoal / totalDays);
 }
 
 export function calculateProgress(goal: PushupGoal, logs: DailyLog[]): {
   totalCompleted: number;
   percentComplete: number;
   daysRemaining: number;
-  dailyTarget: number;
+  dynamicDailyTarget: number;
+  planDailyTarget: number;
   todayCount: number;
   streak: number;
 } {
@@ -136,10 +206,11 @@ export function calculateProgress(goal: PushupGoal, logs: DailyLog[]): {
   const percentComplete = Math.min(100, (totalCompleted / goal.totalGoal) * 100);
   
   const now = new Date();
-  const end = new Date(goal.endDate);
-  const daysRemaining = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  const end = parseISO(goal.endDate);
+  const daysRemaining = Math.max(0, differenceInDays(end, now) + 1);
   
-  const dailyTarget = calculateDailyTarget(goal, totalCompleted);
+  const dynamicDailyTarget = calculateDynamicDailyTarget(goal, logs);
+  const planDailyTarget = calculatePlanTarget(goal);
   
   const today = getTodayDateString();
   const todayLog = logs.find(log => log.date === today);
@@ -165,7 +236,8 @@ export function calculateProgress(goal: PushupGoal, logs: DailyLog[]): {
     totalCompleted,
     percentComplete,
     daysRemaining,
-    dailyTarget,
+    dynamicDailyTarget,
+    planDailyTarget,
     todayCount,
     streak,
   };

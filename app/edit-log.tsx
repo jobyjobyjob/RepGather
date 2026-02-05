@@ -19,7 +19,7 @@ export default function EditLogScreen() {
   const { logs, updateLog, deleteLog } = usePushups();
 
   const existingLog = logs.find(log => log.date === date);
-  const [count, setCount] = useState(existingLog?.count.toString() || '0');
+  const [count, setCount] = useState(existingLog?.count.toString() || '');
 
   useEffect(() => {
     if (existingLog) {
@@ -29,7 +29,11 @@ export default function EditLogScreen() {
 
   const handleCountChange = (text: string) => {
     const numericText = text.replace(/[^0-9]/g, '');
-    setCount(numericText);
+    if (numericText === '' || numericText === '0') {
+      setCount('');
+      return;
+    }
+    setCount(numericText.replace(/^0+/, '') || '');
   };
 
   const handleSave = async () => {
@@ -59,6 +63,7 @@ export default function EditLogScreen() {
   };
 
   const formattedDate = date ? format(parseISO(date), 'EEEE, MMMM d, yyyy') : '';
+  const displayCount = count || '0';
 
   return (
     <KeyboardAvoidingView 

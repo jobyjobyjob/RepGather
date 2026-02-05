@@ -8,20 +8,28 @@ import { format, endOfMonth, differenceInDays, addMonths, startOfMonth } from 'd
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
-import { getTodayDateString } from '@/lib/types';
+import { getTodayDateString, PlanType } from '@/lib/types';
 
 const PRESET_GOALS = [1000, 2000, 5000, 10000];
+
+const PLAN_OPTIONS: { type: PlanType; label: string; description: string }[] = [
+  { type: 'average', label: 'Average', description: 'Same amount each day' },
+  { type: 'increasing', label: 'Increasing', description: 'More each week' },
+  { type: 'custom', label: 'Custom', description: 'Fixed daily target' },
+];
 
 function generateMonthOptions() {
   const options = [];
   const now = new Date();
   for (let i = 0; i < 12; i++) {
     const date = addMonths(startOfMonth(now), i);
+    const lastDay = endOfMonth(date);
     options.push({
       label: format(date, 'MMMM yyyy'),
-      value: format(endOfMonth(date), 'yyyy-MM-dd'),
+      value: format(lastDay, 'yyyy-MM-dd'),
       month: date.getMonth(),
       year: date.getFullYear(),
+      lastDay: lastDay.getDate(),
     });
   }
   return options;
@@ -39,6 +47,8 @@ export default function SetupScreen() {
   const [goalAmount, setGoalAmount] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [selectedEndDate, setSelectedEndDate] = useState<string>(monthOptions[0].value);
+  const [planType, setPlanType] = useState<PlanType>('average');
+  const [customDailyTarget, setCustomDailyTarget] = useState('');
 
   const handleSelectPreset = (amount: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -53,8 +63,14 @@ export default function SetupScreen() {
 
   const handleGoalChange = (text: string) => {
     const numericText = text.replace(/[^0-9]/g, '');
-    setGoalAmount(numericText);
-    const num = parseInt(numericText, 10);
+    if (numericText === '' || numericText === '0') {
+      setGoalAmount('');
+      setSelectedPreset(null);
+      return;
+    }
+    const cleanedText = numericText.replace(/^0+/, '') || '';
+    setGoalAmount(cleanedText);
+    const num = parseInt(cleanedText, 10);
     if (PRESET_GOALS.includes(num)) {
       setSelectedPreset(num);
     } else {
@@ -62,9 +78,23 @@ export default function SetupScreen() {
     }
   };
 
+  const handleCustomTargetChange = (text: string) => {
+    const numericText = text.replace(/[^0-9]/g, '');
+    if (numericText === '' || numericText === '0') {
+      setCustomDailyTarget('');
+      return;
+    }
+    setCustomDailyTarget(numericText.replace(/^0+/, '') || '');
+  };
+
   const handleStartChallenge = async () => {
     const amount = parseInt(goalAmount, 10);
     if (!amount || amount < 1 || !selectedEndDate) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    if (planType === 'custom' && !customDailyTarget) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -77,11 +107,14 @@ export default function SetupScreen() {
       totalGoal: amount,
       startDate,
       endDate: selectedEndDate,
+      planType,
+      customDailyTarget: planType === 'custom' ? parseInt(customDailyTarget, 10) : undefined,
     });
 
     router.back();
   };
 
+  const selectedMonthOption = monthOptions.find(opt => opt.value === selectedEndDate);
   const daysRemaining = selectedEndDate 
     ? Math.max(1, differenceInDays(new Date(selectedEndDate), new Date()) + 1)
     : 0;
@@ -90,7 +123,8 @@ export default function SetupScreen() {
     ? Math.ceil(parseInt(goalAmount, 10) / daysRemaining)
     : 0;
 
-  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && selectedEndDate;
+  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && selectedEndDate && 
+    (planType !== 'custom' || (customDailyTarget && parseInt(customDailyTarget, 10) > 0));
 
   return (
     <KeyboardAvoidingView 
@@ -129,7 +163,7 @@ export default function SetupScreen() {
               style={[styles.input, { color: colors.text, fontFamily: 'Inter_700Bold' }]}
               value={goalAmount}
               onChangeText={handleGoalChange}
-              placeholder="0"
+              placeholder="Enter goal"
               placeholderTextColor={colors.textSecondary}
               keyboardType="number-pad"
               maxLength={7}
@@ -252,6 +286,78 @@ export default function SetupScreen() {
               ))}
             </View>
           )}
+          {selectedMonthOption && (
+            <Text style={[styles.dateHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Ends {format(new Date(selectedEndDate), 'MMMM d, yyyy')}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Daily Plan
+          </Text>
+          <View style={styles.planOptions}>
+            {PLAN_OPTIONS.map((option) => (
+              <Pressable
+                key={option.type}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setPlanType(option.type);
+                }}
+                style={({ pressed }) => [
+                  styles.planOption,
+                  {
+                    backgroundColor: planType === option.type ? colors.tint + '15' : colors.card,
+                    borderColor: planType === option.type ? colors.tint : colors.border,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <View style={styles.planRadio}>
+                  <View style={[
+                    styles.radioOuter,
+                    { borderColor: planType === option.type ? colors.tint : colors.textSecondary }
+                  ]}>
+                    {planType === option.type && (
+                      <View style={[styles.radioInner, { backgroundColor: colors.tint }]} />
+                    )}
+                  </View>
+                </View>
+                <View style={styles.planContent}>
+                  <Text style={[
+                    styles.planLabel,
+                    { color: colors.text, fontFamily: 'Inter_600SemiBold' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                  <Text style={[
+                    styles.planDescription,
+                    { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }
+                  ]}>
+                    {option.description}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+
+          {planType === 'custom' && (
+            <View style={[styles.customInputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.customInput, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}
+                value={customDailyTarget}
+                onChangeText={handleCustomTargetChange}
+                placeholder="Daily target"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              <Text style={[styles.inputSuffix, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+                per day
+              </Text>
+            </View>
+          )}
         </View>
 
         {isValid && (
@@ -259,11 +365,16 @@ export default function SetupScreen() {
             <View style={styles.summaryRow}>
               <Ionicons name="calculator" size={20} color={colors.tint} />
               <Text style={[styles.summaryText, { color: colors.text, fontFamily: 'Inter_500Medium' }]}>
-                That's about <Text style={[styles.summaryHighlight, { color: colors.tint, fontFamily: 'Inter_700Bold' }]}>{dailyAverage}</Text> push-ups per day
+                {planType === 'custom' 
+                  ? `Fixed target: ${customDailyTarget} push-ups/day`
+                  : planType === 'increasing'
+                  ? `Starts at ~${Math.ceil(dailyAverage * 0.7)}, builds to ~${Math.ceil(dailyAverage * 1.5)}/day`
+                  : `About ${dailyAverage} push-ups per day`
+                }
               </Text>
             </View>
             <Text style={[styles.summarySubtext, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              {daysRemaining} days remaining • End: {format(new Date(selectedEndDate), 'MMMM d, yyyy')}
+              {daysRemaining} days remaining
             </Text>
           </View>
         )}
@@ -332,14 +443,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    gap: 32,
+    gap: 28,
     paddingBottom: 20,
   },
   section: {
-    gap: 16,
+    gap: 12,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -351,7 +462,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 32,
+    fontSize: 28,
     paddingVertical: 0,
   },
   inputSuffix: {
@@ -364,13 +475,13 @@ const styles = StyleSheet.create({
   },
   presetButton: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
   },
   presetText: {
-    fontSize: 16,
+    fontSize: 15,
   },
   monthGrid: {
     flexDirection: 'row',
@@ -379,22 +490,81 @@ const styles = StyleSheet.create({
   },
   monthButton: {
     width: '31%',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     gap: 2,
   },
   monthText: {
-    fontSize: 16,
+    fontSize: 15,
   },
   yearText: {
-    fontSize: 12,
+    fontSize: 11,
+  },
+  dateHint: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  planOptions: {
+    gap: 10,
+  },
+  planOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 14,
+  },
+  planRadio: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  planContent: {
+    flex: 1,
+    gap: 2,
+  },
+  planLabel: {
+    fontSize: 16,
+  },
+  planDescription: {
+    fontSize: 13,
+  },
+  customInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  customInput: {
+    flex: 1,
+    fontSize: 20,
+    paddingVertical: 0,
   },
   summaryCard: {
-    padding: 20,
-    borderRadius: 16,
-    gap: 8,
+    padding: 18,
+    borderRadius: 14,
+    gap: 6,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -402,13 +572,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryText: {
-    fontSize: 16,
-  },
-  summaryHighlight: {
-    fontSize: 18,
+    fontSize: 15,
+    flex: 1,
   },
   summarySubtext: {
-    fontSize: 14,
+    fontSize: 13,
     marginLeft: 30,
   },
   footer: {

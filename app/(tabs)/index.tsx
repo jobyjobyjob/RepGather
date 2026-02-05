@@ -86,8 +86,20 @@ export default function TodayScreen() {
     );
   }
 
-  const todayProgress = progress ? Math.min(100, (progress.todayCount / progress.dailyTarget) * 100) : 0;
-  const todayComplete = progress && progress.todayCount >= progress.dailyTarget;
+  const dynamicTarget = progress?.dynamicDailyTarget || 0;
+  const planTarget = progress?.planDailyTarget || 0;
+  const todayCount = progress?.todayCount || 0;
+  
+  const primaryTarget = dynamicTarget;
+  const todayProgress = primaryTarget > 0 ? Math.min(100, (todayCount / primaryTarget) * 100) : 0;
+  const todayComplete = todayCount >= primaryTarget;
+
+  const getPlanTypeLabel = () => {
+    if (goal.planType === 'average') return 'Average';
+    if (goal.planType === 'increasing') return 'Increasing';
+    if (goal.planType === 'custom') return 'Custom';
+    return '';
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -107,7 +119,7 @@ export default function TodayScreen() {
             {getGreeting()}
           </Text>
           <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-            {progress?.todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
+            {todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
           </Text>
         </View>
 
@@ -138,7 +150,26 @@ export default function TodayScreen() {
             </Text>
             <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : colors.tint + '20' }]}>
               <Text style={[styles.targetText, { color: todayComplete ? colors.success : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
-                {progress?.dailyTarget || 0} push-ups
+                {dynamicTarget} needed
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.targetDetails}>
+            <View style={styles.targetRow}>
+              <Text style={[styles.targetLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Dynamic (to stay on track)
+              </Text>
+              <Text style={[styles.targetValue, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                {dynamicTarget}
+              </Text>
+            </View>
+            <View style={styles.targetRow}>
+              <Text style={[styles.targetLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Plan ({getPlanTypeLabel()})
+              </Text>
+              <Text style={[styles.targetValue, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                {planTarget}
               </Text>
             </View>
           </View>
@@ -156,14 +187,14 @@ export default function TodayScreen() {
               />
             </View>
             <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              {progress?.todayCount || 0} / {progress?.dailyTarget || 0}
+              {todayCount} / {dynamicTarget}
               {todayComplete && ' - Complete!'}
             </Text>
           </View>
         </View>
 
         <CounterButton
-          count={progress?.todayCount || 0}
+          count={todayCount}
           onIncrement={handleIncrement}
           tintColor={colors.tint}
           textColor={colors.text}
@@ -176,7 +207,7 @@ export default function TodayScreen() {
           accentColor={colors.tint}
         />
 
-        {(progress?.todayCount || 0) > 0 && (
+        {todayCount > 0 && (
           <Animated.View style={finishAnimStyle}>
             <Pressable
               onPress={handleFinishDay}
@@ -298,6 +329,20 @@ const styles = StyleSheet.create({
   },
   targetText: {
     fontSize: 14,
+  },
+  targetDetails: {
+    gap: 8,
+  },
+  targetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  targetLabel: {
+    fontSize: 14,
+  },
+  targetValue: {
+    fontSize: 16,
   },
   todayProgressBar: {
     gap: 8,
