@@ -69,6 +69,34 @@ export async function logPushups(count: number): Promise<DailyLog> {
   }
 }
 
+export async function updateLogForDate(date: string, count: number): Promise<DailyLog> {
+  const data = await loadAppData();
+  
+  const existingIndex = data.logs.findIndex(log => log.date === date);
+  
+  if (existingIndex >= 0) {
+    data.logs[existingIndex].count = count;
+    await saveAppData(data);
+    return data.logs[existingIndex];
+  } else {
+    const newLog: DailyLog = {
+      id: generateId(),
+      date,
+      count,
+      createdAt: new Date().toISOString(),
+    };
+    data.logs.push(newLog);
+    await saveAppData(data);
+    return newLog;
+  }
+}
+
+export async function deleteLogForDate(date: string): Promise<void> {
+  const data = await loadAppData();
+  data.logs = data.logs.filter(log => log.date !== date);
+  await saveAppData(data);
+}
+
 export async function getTodayLog(): Promise<DailyLog | null> {
   const data = await loadAppData();
   const today = getTodayDateString();

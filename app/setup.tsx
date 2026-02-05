@@ -4,19 +4,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { addDays, addWeeks, addMonths, format } from 'date-fns';
+import { format, endOfMonth, differenceInDays, addMonths, startOfMonth } from 'date-fns';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
 import { getTodayDateString } from '@/lib/types';
 
 const PRESET_GOALS = [1000, 2000, 5000, 10000];
-const DURATION_OPTIONS = [
-  { label: '2 Weeks', value: 14 },
-  { label: '1 Month', value: 30 },
-  { label: '2 Months', value: 60 },
-  { label: '3 Months', value: 90 },
-];
+
+function generateMonthOptions() {
+  const options = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const date = addMonths(startOfMonth(now), i);
+    options.push({
+      label: format(date, 'MMMM yyyy'),
+      value: format(endOfMonth(date), 'yyyy-MM-dd'),
+      month: date.getMonth(),
+      year: date.getFullYear(),
+    });
+  }
+  return options;
+}
 
 export default function SetupScreen() {
   const colorScheme = useColorScheme();
@@ -26,9 +35,10 @@ export default function SetupScreen() {
 
   const { setGoal } = usePushups();
 
+  const monthOptions = generateMonthOptions();
   const [goalAmount, setGoalAmount] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<number | null>(30);
+  const [selectedEndDate, setSelectedEndDate] = useState<string>(monthOptions[0].value);
 
   const handleSelectPreset = (amount: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -36,9 +46,9 @@ export default function SetupScreen() {
     setGoalAmount(amount.toString());
   };
 
-  const handleSelectDuration = (days: number) => {
+  const handleSelectEndDate = (dateValue: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedDuration(days);
+    setSelectedEndDate(dateValue);
   };
 
   const handleGoalChange = (text: string) => {
@@ -54,7 +64,7 @@ export default function SetupScreen() {
 
   const handleStartChallenge = async () => {
     const amount = parseInt(goalAmount, 10);
-    if (!amount || amount < 1 || !selectedDuration) {
+    if (!amount || amount < 1 || !selectedEndDate) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -62,22 +72,25 @@ export default function SetupScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const startDate = getTodayDateString();
-    const endDate = format(addDays(new Date(), selectedDuration), 'yyyy-MM-dd');
 
     await setGoal({
       totalGoal: amount,
       startDate,
-      endDate,
+      endDate: selectedEndDate,
     });
 
     router.back();
   };
 
-  const dailyAverage = goalAmount && selectedDuration
-    ? Math.ceil(parseInt(goalAmount, 10) / selectedDuration)
+  const daysRemaining = selectedEndDate 
+    ? Math.max(1, differenceInDays(new Date(selectedEndDate), new Date()) + 1)
     : 0;
 
-  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && selectedDuration;
+  const dailyAverage = goalAmount && daysRemaining
+    ? Math.ceil(parseInt(goalAmount, 10) / daysRemaining)
+    : 0;
+
+  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && selectedEndDate;
 
   return (
     <KeyboardAvoidingView 
@@ -157,36 +170,88 @@ export default function SetupScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            Challenge duration
+            Complete by end of
           </Text>
-          <View style={styles.durationGrid}>
-            {DURATION_OPTIONS.map((option) => (
+          <View style={styles.monthGrid}>
+            {monthOptions.slice(0, 6).map((option) => (
               <Pressable
                 key={option.value}
-                onPress={() => handleSelectDuration(option.value)}
+                onPress={() => handleSelectEndDate(option.value)}
                 style={({ pressed }) => [
-                  styles.durationButton,
+                  styles.monthButton,
                   {
-                    backgroundColor: selectedDuration === option.value ? colors.tint : colors.card,
-                    borderColor: selectedDuration === option.value ? colors.tint : colors.border,
+                    backgroundColor: selectedEndDate === option.value ? colors.tint : colors.card,
+                    borderColor: selectedEndDate === option.value ? colors.tint : colors.border,
                   },
                   pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
                 ]}
               >
                 <Text
                   style={[
-                    styles.durationText,
+                    styles.monthText,
                     {
-                      color: selectedDuration === option.value ? '#FFFFFF' : colors.text,
+                      color: selectedEndDate === option.value ? '#FFFFFF' : colors.text,
                       fontFamily: 'Inter_600SemiBold',
                     },
                   ]}
                 >
-                  {option.label}
+                  {format(new Date(option.year, option.month), 'MMM')}
+                </Text>
+                <Text
+                  style={[
+                    styles.yearText,
+                    {
+                      color: selectedEndDate === option.value ? '#FFFFFF' : colors.textSecondary,
+                      fontFamily: 'Inter_400Regular',
+                    },
+                  ]}
+                >
+                  {option.year}
                 </Text>
               </Pressable>
             ))}
           </View>
+          {monthOptions.length > 6 && (
+            <View style={styles.monthGrid}>
+              {monthOptions.slice(6).map((option) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => handleSelectEndDate(option.value)}
+                  style={({ pressed }) => [
+                    styles.monthButton,
+                    {
+                      backgroundColor: selectedEndDate === option.value ? colors.tint : colors.card,
+                      borderColor: selectedEndDate === option.value ? colors.tint : colors.border,
+                    },
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.monthText,
+                      {
+                        color: selectedEndDate === option.value ? '#FFFFFF' : colors.text,
+                        fontFamily: 'Inter_600SemiBold',
+                      },
+                    ]}
+                  >
+                    {format(new Date(option.year, option.month), 'MMM')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.yearText,
+                      {
+                        color: selectedEndDate === option.value ? '#FFFFFF' : colors.textSecondary,
+                        fontFamily: 'Inter_400Regular',
+                      },
+                    ]}
+                  >
+                    {option.year}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         {isValid && (
@@ -198,7 +263,7 @@ export default function SetupScreen() {
               </Text>
             </View>
             <Text style={[styles.summarySubtext, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              End date: {format(addDays(new Date(), selectedDuration!), 'MMMM d, yyyy')}
+              {daysRemaining} days remaining • End: {format(new Date(selectedEndDate), 'MMMM d, yyyy')}
             </Text>
           </View>
         )}
@@ -268,6 +333,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     gap: 32,
+    paddingBottom: 20,
   },
   section: {
     gap: 16,
@@ -306,20 +372,24 @@ const styles = StyleSheet.create({
   presetText: {
     fontSize: 16,
   },
-  durationGrid: {
+  monthGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
-  durationButton: {
-    width: '48%',
-    paddingVertical: 18,
+  monthButton: {
+    width: '31%',
+    paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
+    gap: 2,
   },
-  durationText: {
+  monthText: {
     fontSize: 16,
+  },
+  yearText: {
+    fontSize: 12,
   },
   summaryCard: {
     padding: 20,

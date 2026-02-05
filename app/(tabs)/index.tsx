@@ -1,9 +1,10 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
@@ -19,6 +20,12 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
 
   const { isLoading, goal, progress, logPushups } = usePushups();
+  const [dayFinished, setDayFinished] = useState(false);
+
+  const finishScale = useSharedValue(1);
+  const finishAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: finishScale.value }],
+  }));
 
   const handleIncrement = () => {
     logPushups(1);
@@ -26,6 +33,20 @@ export default function TodayScreen() {
 
   const handleQuickAdd = (count: number) => {
     logPushups(count);
+  };
+
+  const handleFinishDay = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    finishScale.value = withSequence(
+      withSpring(1.1, { damping: 10, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 400 })
+    );
+    setDayFinished(true);
+    Alert.alert(
+      'Great work!',
+      `You completed ${progress?.todayCount || 0} push-ups today. Keep up the momentum!`,
+      [{ text: 'Awesome!', onPress: () => {} }]
+    );
   };
 
   if (isLoading) {
@@ -66,6 +87,7 @@ export default function TodayScreen() {
   }
 
   const todayProgress = progress ? Math.min(100, (progress.todayCount / progress.dailyTarget) * 100) : 0;
+  const todayComplete = progress && progress.todayCount >= progress.dailyTarget;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -85,7 +107,7 @@ export default function TodayScreen() {
             {getGreeting()}
           </Text>
           <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-            {progress?.todayCount === 0 ? "Let's get started!" : "Keep pushing!"}
+            {progress?.todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
           </Text>
         </View>
 
@@ -114,8 +136,8 @@ export default function TodayScreen() {
             <Text style={[styles.dailyTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
               Today's Target
             </Text>
-            <View style={[styles.targetBadge, { backgroundColor: colors.tint + '20' }]}>
-              <Text style={[styles.targetText, { color: colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
+            <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : colors.tint + '20' }]}>
+              <Text style={[styles.targetText, { color: todayComplete ? colors.success : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
                 {progress?.dailyTarget || 0} push-ups
               </Text>
             </View>
@@ -127,7 +149,7 @@ export default function TodayScreen() {
                 style={[
                   styles.progressFill, 
                   { 
-                    backgroundColor: todayProgress >= 100 ? colors.success : colors.tint,
+                    backgroundColor: todayComplete ? colors.success : colors.tint,
                     width: `${Math.min(100, todayProgress)}%`,
                   }
                 ]} 
@@ -135,6 +157,7 @@ export default function TodayScreen() {
             </View>
             <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
               {progress?.todayCount || 0} / {progress?.dailyTarget || 0}
+              {todayComplete && ' - Complete!'}
             </Text>
           </View>
         </View>
@@ -152,6 +175,37 @@ export default function TodayScreen() {
           textColor={colors.text}
           accentColor={colors.tint}
         />
+
+        {(progress?.todayCount || 0) > 0 && (
+          <Animated.View style={finishAnimStyle}>
+            <Pressable
+              onPress={handleFinishDay}
+              style={({ pressed }) => [
+                styles.finishButton,
+                { 
+                  backgroundColor: dayFinished ? colors.success : colors.card,
+                  borderColor: dayFinished ? colors.success : colors.success,
+                },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <Ionicons 
+                name={dayFinished ? "checkmark-circle" : "checkmark-circle-outline"} 
+                size={24} 
+                color={dayFinished ? '#FFFFFF' : colors.success} 
+              />
+              <Text style={[
+                styles.finishButtonText, 
+                { 
+                  color: dayFinished ? '#FFFFFF' : colors.success,
+                  fontFamily: 'Inter_600SemiBold',
+                }
+              ]}>
+                {dayFinished ? 'Day Complete!' : 'Finish Day'}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
 
         <View style={styles.statsRow}>
           <StatCard
@@ -300,6 +354,19 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     color: '#FFFFFF',
+    fontSize: 18,
+  },
+  finishButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  finishButtonText: {
     fontSize: 18,
   },
 });

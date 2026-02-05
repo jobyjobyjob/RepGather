@@ -22,6 +22,13 @@ function RootLayoutNav() {
           presentation: 'modal',
         }} 
       />
+      <Stack.Screen 
+        name="edit-log" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal',
+        }} 
+      />
     </Stack>
   );
 }

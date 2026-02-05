@@ -19,6 +19,8 @@ interface PushupContextValue {
   progress: ProgressData | null;
   setGoal: (goal: Omit<PushupGoal, 'id' | 'createdAt'>) => Promise<void>;
   logPushups: (count: number) => Promise<void>;
+  updateLog: (date: string, count: number) => Promise<void>;
+  deleteLog: (date: string) => Promise<void>;
   updateReminders: (settings: ReminderSettings) => Promise<void>;
   resetChallenge: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -54,6 +56,16 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     await refresh();
   }, [refresh]);
 
+  const updateLog = useCallback(async (date: string, count: number) => {
+    await Storage.updateLogForDate(date, count);
+    await refresh();
+  }, [refresh]);
+
+  const deleteLog = useCallback(async (date: string) => {
+    await Storage.deleteLogForDate(date);
+    await refresh();
+  }, [refresh]);
+
   const updateReminders = useCallback(async (settings: ReminderSettings) => {
     await Storage.updateReminderSettings(settings);
     await refresh();
@@ -77,10 +89,12 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     progress,
     setGoal,
     logPushups,
+    updateLog,
+    deleteLog,
     updateReminders,
     resetChallenge,
     refresh,
-  }), [isLoading, data, progress, setGoal, logPushups, updateReminders, resetChallenge, refresh]);
+  }), [isLoading, data, progress, setGoal, logPushups, updateLog, deleteLog, updateReminders, resetChallenge, refresh]);
 
   return (
     <PushupContext.Provider value={value}>

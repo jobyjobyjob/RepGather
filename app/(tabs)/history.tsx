@@ -1,8 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, useColorScheme, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO, startOfWeek, eachDayOfInterval, subDays } from 'date-fns';
+import * as Haptics from 'expo-haptics';
+import { format, parseISO, eachDayOfInterval, subDays } from 'date-fns';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
@@ -14,6 +16,11 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
 
   const { isLoading, goal, logs, progress } = usePushups();
+
+  const handleEditLog = (date: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: '/edit-log', params: { date } });
+  };
 
   if (isLoading) {
     return (
@@ -108,9 +115,14 @@ export default function HistoryScreen() {
                 const log = getLogForDate(date);
                 const hasActivity = log && log.count > 0;
                 const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                const dateStr = format(date, 'yyyy-MM-dd');
                 
                 return (
-                  <View key={index} style={styles.dayColumn}>
+                  <Pressable 
+                    key={index} 
+                    style={styles.dayColumn}
+                    onPress={() => handleEditLog(dateStr)}
+                  >
                     <Text style={[styles.dayLabel, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
                       {format(date, 'EEE')}
                     </Text>
@@ -131,10 +143,13 @@ export default function HistoryScreen() {
                     <Text style={[styles.dayCount, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
                       {log?.count || 0}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
+            <Text style={[styles.weekHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Tap any day to edit
+            </Text>
           </View>
         </View>
 
@@ -151,7 +166,15 @@ export default function HistoryScreen() {
           ) : (
             <View style={styles.logList}>
               {sortedLogs.map((log) => (
-                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.card }]}>
+                <Pressable 
+                  key={log.id} 
+                  style={({ pressed }) => [
+                    styles.logItem, 
+                    { backgroundColor: colors.card },
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => handleEditLog(log.date)}
+                >
                   <View style={styles.logDate}>
                     <Text style={[styles.logDay, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
                       {format(parseISO(log.date), 'd')}
@@ -168,10 +191,10 @@ export default function HistoryScreen() {
                       {format(parseISO(log.date), 'EEEE')}
                     </Text>
                   </View>
-                  <View style={[styles.logIcon, { backgroundColor: colors.tint + '20' }]}>
-                    <Ionicons name="fitness" size={20} color={colors.tint} />
+                  <View style={styles.logActions}>
+                    <Ionicons name="pencil" size={18} color={colors.textSecondary} />
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
@@ -233,6 +256,7 @@ const styles = StyleSheet.create({
   weekCard: {
     padding: 20,
     borderRadius: 20,
+    gap: 12,
   },
   weekRow: {
     flexDirection: 'row',
@@ -255,6 +279,10 @@ const styles = StyleSheet.create({
   },
   dayCount: {
     fontSize: 14,
+  },
+  weekHint: {
+    fontSize: 12,
+    textAlign: 'center',
   },
   emptyLog: {
     padding: 24,
@@ -296,10 +324,9 @@ const styles = StyleSheet.create({
   logTime: {
     fontSize: 14,
   },
-  logIcon: {
+  logActions: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
