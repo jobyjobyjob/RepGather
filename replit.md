@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 - Uses expo-router's typed routes for type-safe navigation
 
 ### Component Architecture
-- Reusable UI components: `ProgressRing`, `CounterButton`, `StatCard`, `QuickAddButtons`
+- Reusable UI components: `ProgressRing`, `CounterButton`, `StatCard`, `QuickAddButtons`, `MonthCalendar`
 - Error boundary implementation for graceful error handling
 - Platform-aware components that adapt to iOS, Android, and web
 
