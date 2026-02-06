@@ -57,7 +57,7 @@ export default function SettingsScreen() {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Time for Push-ups!',
-          body: `You have ${progress?.dailyTarget || 0} push-ups to do today. Let's go!`,
+          body: `You have ${progress?.dynamicDailyTarget || 0} push-ups to do today. Let's go!`,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,

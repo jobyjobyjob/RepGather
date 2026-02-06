@@ -12,6 +12,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { CounterButton } from '@/components/CounterButton';
 import { StatCard } from '@/components/StatCard';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
+import { MonthCalendar } from '@/components/MonthCalendar';
 
 export default function TodayScreen() {
   const colorScheme = useColorScheme();
@@ -19,7 +20,7 @@ export default function TodayScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, goal, progress, logPushups } = usePushups();
+  const { isLoading, goal, logs, progress, logPushups } = usePushups();
   const [dayFinished, setDayFinished] = useState(false);
 
   const finishScale = useSharedValue(1);
@@ -258,6 +259,8 @@ export default function TodayScreen() {
             textSecondary={colors.textSecondary}
           />
         </View>
+
+        <MonthCalendar goal={goal} logs={logs} colors={colors} />
       </ScrollView>
     </View>
   );
