@@ -7,7 +7,63 @@ import * as Haptics from 'expo-haptics';
 import { format, parseISO, eachDayOfInterval, subDays } from 'date-fns';
 
 import Colors from '@/constants/colors';
-import { usePushups } from '@/contexts/PushupContext';
+import { usePushups, Challenge } from '@/contexts/PushupContext';
+
+function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
+  challenges: Challenge[];
+  activeChallengeId: string | null;
+  onSelect: (id: string) => void;
+  colors: any;
+}) {
+  if (challenges.length === 0) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.challengePickerContent}
+      style={styles.challengePickerScroll}
+    >
+      {challenges.map((challenge) => {
+        const isActive = challenge.id === activeChallengeId;
+        return (
+          <Pressable
+            key={challenge.id}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(challenge.id);
+            }}
+            style={[
+              styles.challengeChip,
+              {
+                backgroundColor: isActive ? colors.tint : colors.card,
+                borderColor: isActive ? colors.tint : colors.border,
+              },
+            ]}
+          >
+            <Ionicons
+              name={challenge.isPersonal ? "person" : "people"}
+              size={14}
+              color={isActive ? '#FFFFFF' : colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.challengeChipText,
+                {
+                  color: isActive ? '#FFFFFF' : colors.text,
+                  fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {challenge.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
 
 export default function HistoryScreen() {
   const colorScheme = useColorScheme();
@@ -15,11 +71,17 @@ export default function HistoryScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, goal, logs, progress } = usePushups();
+  const { isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge } = usePushups();
+
+  const exerciseLabel = activeChallenge?.exerciseType?.toLowerCase() || 'reps';
 
   const handleEditLog = (date: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: '/edit-log', params: { date } });
+  };
+
+  const handleChallengeSelect = (id: string) => {
+    setActiveChallenge(id);
   };
 
   if (isLoading) {
@@ -30,15 +92,48 @@ export default function HistoryScreen() {
     );
   }
 
-  if (!goal) {
+  if (challenges.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.emptyState, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) }]}>
           <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            Start a challenge to see your history
+            Create a challenge to see your history
           </Text>
         </View>
+      </View>
+    );
+  }
+
+  if (!activeChallenge) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 16),
+              paddingBottom: Platform.OS === 'web' ? 118 : 100,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+            Your Progress
+          </Text>
+          <ChallengePicker
+            challenges={challenges}
+            activeChallengeId={null}
+            onSelect={handleChallengeSelect}
+            colors={colors}
+          />
+          <View style={[styles.selectPrompt, { backgroundColor: colors.card }]}>
+            <Text style={[styles.selectPromptText, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+              Select a challenge above to view history
+            </Text>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -53,7 +148,7 @@ export default function HistoryScreen() {
     return logs.find(log => log.date === dateStr);
   };
 
-  const sortedLogs = [...logs].sort((a, b) => 
+  const sortedLogs = [...logs].sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
@@ -63,7 +158,7 @@ export default function HistoryScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { 
+          {
             paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 16),
             paddingBottom: Platform.OS === 'web' ? 118 : 100,
           },
@@ -74,6 +169,13 @@ export default function HistoryScreen() {
           Your Progress
         </Text>
 
+        <ChallengePicker
+          challenges={challenges}
+          activeChallengeId={activeChallengeId}
+          onSelect={handleChallengeSelect}
+          colors={colors}
+        />
+
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
@@ -81,7 +183,7 @@ export default function HistoryScreen() {
                 {progress?.totalCompleted.toLocaleString() || 0}
               </Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Total Reps
+                Total {exerciseLabel}
               </Text>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -116,10 +218,10 @@ export default function HistoryScreen() {
                 const hasActivity = log && log.count > 0;
                 const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
                 const dateStr = format(date, 'yyyy-MM-dd');
-                
+
                 return (
-                  <Pressable 
-                    key={index} 
+                  <Pressable
+                    key={index}
                     style={styles.dayColumn}
                     onPress={() => handleEditLog(dateStr)}
                   >
@@ -160,16 +262,16 @@ export default function HistoryScreen() {
           {sortedLogs.length === 0 ? (
             <View style={[styles.emptyLog, { backgroundColor: colors.card }]}>
               <Text style={[styles.emptyLogText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                No activity yet. Start logging your push-ups!
+                No activity yet. Start logging your {exerciseLabel}!
               </Text>
             </View>
           ) : (
             <View style={styles.logList}>
               {sortedLogs.map((log) => (
-                <Pressable 
-                  key={log.id} 
+                <Pressable
+                  key={log.id}
                   style={({ pressed }) => [
-                    styles.logItem, 
+                    styles.logItem,
                     { backgroundColor: colors.card },
                     pressed && { opacity: 0.8 },
                   ]}
@@ -185,7 +287,7 @@ export default function HistoryScreen() {
                   </View>
                   <View style={styles.logContent}>
                     <Text style={[styles.logCount, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                      {log.count} push-ups
+                      {log.count} {exerciseLabel}
                     </Text>
                     <Text style={[styles.logTime, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
                       {format(parseISO(log.date), 'EEEE')}
@@ -222,6 +324,35 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
+  },
+  challengePickerScroll: {
+    marginHorizontal: -20,
+  },
+  challengePickerContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  challengeChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  challengeChipText: {
+    fontSize: 14,
+    maxWidth: 120,
+  },
+  selectPrompt: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center' as const,
+  },
+  selectPromptText: {
+    fontSize: 15,
+    textAlign: 'center' as const,
   },
   summaryCard: {
     padding: 20,

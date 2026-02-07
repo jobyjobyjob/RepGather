@@ -1,23 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, DailyLog, PushupGoal, ReminderSettings, generateId, getTodayDateString } from '@/lib/types';
-import * as Storage from '@/lib/storage';
 import { apiRequest, queryClient } from '@/lib/query-client';
+import { differenceInDays, parseISO, startOfDay, format } from 'date-fns';
 
-const ACTIVE_GROUP_KEY = 'pushup_pro_active_group';
+const ACTIVE_CHALLENGE_KEY = 'gritgather_active_challenge';
 
-interface ProgressData {
-  totalCompleted: number;
-  percentComplete: number;
-  daysRemaining: number;
-  totalDays: number;
-  dynamicDailyTarget: number;
-  planDailyTarget: number;
-  todayCount: number;
-  streak: number;
+function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0];
 }
 
-interface GroupInfo {
+export interface Challenge {
   id: string;
   name: string;
   exerciseType: string;
@@ -26,221 +18,251 @@ interface GroupInfo {
   startDate: string;
   endDate: string;
   inviteCode: string;
+  isPersonal: boolean;
+  createdBy: string;
   myIndividualGoal?: number | null;
+}
+
+export interface LogEntry {
+  id: string;
+  date: string;
+  count: number;
+}
+
+interface ProgressData {
+  totalCompleted: number;
+  percentComplete: number;
+  daysRemaining: number;
+  totalDays: number;
+  dynamicDailyTarget: number;
+  todayCount: number;
+  streak: number;
 }
 
 interface PushupContextValue {
   isLoading: boolean;
-  goal: PushupGoal | null;
-  logs: DailyLog[];
-  reminderSettings: ReminderSettings;
+  challenges: Challenge[];
+  activeChallengeId: string | null;
+  activeChallenge: Challenge | null;
+  logs: LogEntry[];
   progress: ProgressData | null;
-  activeGroupId: string | null;
-  activeGroup: GroupInfo | null;
-  setGoal: (goal: Omit<PushupGoal, 'id' | 'createdAt'>) => Promise<void>;
-  logPushups: (count: number) => Promise<void>;
+  setActiveChallenge: (challengeId: string | null) => Promise<void>;
+  logActivity: (count: number) => Promise<void>;
   updateLog: (date: string, count: number) => Promise<void>;
   deleteLog: (date: string) => Promise<void>;
-  updateReminders: (settings: ReminderSettings) => Promise<void>;
-  resetChallenge: () => Promise<void>;
   refresh: () => Promise<void>;
-  setActiveGroup: (groupId: string | null) => Promise<void>;
+  createPersonalChallenge: (data: { name: string; exerciseType: string; totalGoal: number; startDate: string; endDate: string }) => Promise<Challenge>;
+  deleteChallenge: (challengeId: string) => Promise<void>;
 }
 
 const PushupContext = createContext<PushupContextValue | null>(null);
 
+function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData {
+  const totalCompleted = logs.reduce((sum, log) => sum + log.count, 0);
+
+  let goalValue = challenge.totalGoal;
+  if (challenge.goalType === 'individual' && challenge.myIndividualGoal) {
+    goalValue = challenge.myIndividualGoal;
+  }
+
+  const percentComplete = goalValue > 0 ? Math.min(100, (totalCompleted / goalValue) * 100) : 0;
+
+  const today = startOfDay(new Date());
+  const end = startOfDay(parseISO(challenge.endDate));
+  const start = startOfDay(parseISO(challenge.startDate));
+  const daysRemaining = Math.max(1, differenceInDays(end, today) + 1);
+  const totalDays = differenceInDays(end, start) + 1;
+
+  const remaining = goalValue - totalCompleted;
+  const dynamicDailyTarget = remaining <= 0 ? 0 : Math.ceil(remaining / daysRemaining);
+
+  const todayStr = getTodayDateString();
+  const todayLog = logs.find(log => log.date === todayStr);
+  const todayCount = todayLog?.count || 0;
+
+  const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  let streak = 0;
+  let checkDate = new Date();
+  for (let i = 0; i < 366; i++) {
+    const expectedDate = format(checkDate, 'yyyy-MM-dd');
+    const log = sortedLogs.find(l => l.date === expectedDate);
+    if (log && log.count > 0) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return {
+    totalCompleted,
+    percentComplete,
+    daysRemaining,
+    totalDays,
+    dynamicDailyTarget,
+    todayCount,
+    streak,
+  };
+}
+
 export function PushupProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
-  const [activeGroupId, setActiveGroupIdState] = useState<string | null>(null);
-  const [activeGroup, setActiveGroup] = useState<GroupInfo | null>(null);
-  const [serverLogs, setServerLogs] = useState<DailyLog[]>([]);
-  const [data, setData] = useState<AppData>({
-    goal: null,
-    logs: [],
-    reminderSettings: { enabled: false, times: ['09:00', '14:00', '19:00'] },
-  });
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [activeChallengeId, setActiveChallengeIdState] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  const loadActiveGroupId = useCallback(async () => {
+  const activeChallenge = useMemo(() => {
+    if (!activeChallengeId) return null;
+    return challenges.find(c => c.id === activeChallengeId) || null;
+  }, [challenges, activeChallengeId]);
+
+  const progress = useMemo(() => {
+    if (!activeChallenge) return null;
+    return calculateProgress(activeChallenge, logs);
+  }, [activeChallenge, logs]);
+
+  const fetchChallenges = useCallback(async (): Promise<Challenge[]> => {
     try {
-      const stored = await AsyncStorage.getItem(ACTIVE_GROUP_KEY);
-      if (stored) {
-        setActiveGroupIdState(stored);
-        return stored;
-      }
-    } catch {}
-    return null;
+      const res = await apiRequest("GET", "/api/challenges");
+      const data = await res.json();
+      setChallenges(data);
+      return data;
+    } catch {
+      return [];
+    }
   }, []);
 
-  const fetchGroupData = useCallback(async (groupId: string) => {
+  const fetchLogs = useCallback(async (challengeId: string) => {
     try {
-      const [groupRes, logsRes] = await Promise.all([
-        apiRequest("GET", `/api/groups`),
-        apiRequest("GET", `/api/logs/${groupId}`),
-      ]);
-      const groups = await groupRes.json();
-      const logs = await logsRes.json();
-
-      const group = groups.find((g: GroupInfo) => g.id === groupId);
-      if (group) {
-        setActiveGroup(group);
-        const mappedLogs: DailyLog[] = logs.map((l: any) => ({
-          id: l.id?.toString() || generateId(),
-          date: l.date,
-          count: l.count,
-          createdAt: l.createdAt || new Date().toISOString(),
-        }));
-        setServerLogs(mappedLogs);
-      } else {
-        await AsyncStorage.removeItem(ACTIVE_GROUP_KEY);
-        setActiveGroupIdState(null);
-        setActiveGroup(null);
-        setServerLogs([]);
-      }
-    } catch (err) {
-      console.error('Failed to fetch group data:', err);
+      const res = await apiRequest("GET", `/api/logs/${challengeId}`);
+      const data = await res.json();
+      const mapped: LogEntry[] = data.map((l: any) => ({
+        id: l.id?.toString() || Date.now().toString(),
+        date: l.date,
+        count: l.count,
+      }));
+      setLogs(mapped);
+    } catch {
+      setLogs([]);
     }
   }, []);
 
   const refresh = useCallback(async () => {
-    const appData = await Storage.loadAppData();
-    setData(appData);
+    try {
+      const allChallenges = await fetchChallenges();
 
-    const groupId = activeGroupId || await loadActiveGroupId();
-    if (groupId) {
-      await fetchGroupData(groupId);
+      let storedId: string | null = null;
+      try {
+        storedId = await AsyncStorage.getItem(ACTIVE_CHALLENGE_KEY);
+      } catch {}
+
+      if (storedId && allChallenges.find(c => c.id === storedId)) {
+        setActiveChallengeIdState(storedId);
+        await fetchLogs(storedId);
+      } else if (allChallenges.length > 0 && !storedId) {
+        setActiveChallengeIdState(null);
+        setLogs([]);
+      } else {
+        if (storedId) {
+          await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
+        }
+        setActiveChallengeIdState(null);
+        setLogs([]);
+      }
+    } catch (err) {
+      console.error('Failed to refresh challenges:', err);
     }
     setIsLoading(false);
-  }, [activeGroupId, loadActiveGroupId, fetchGroupData]);
+  }, [fetchChallenges, fetchLogs]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     refresh();
-  }, [refresh]);
-
-  const setActiveGroupFn = useCallback(async (groupId: string | null) => {
-    if (groupId) {
-      await AsyncStorage.setItem(ACTIVE_GROUP_KEY, groupId);
-      setActiveGroupIdState(groupId);
-      await fetchGroupData(groupId);
-    } else {
-      await AsyncStorage.removeItem(ACTIVE_GROUP_KEY);
-      setActiveGroupIdState(null);
-      setActiveGroup(null);
-      setServerLogs([]);
-    }
-  }, [fetchGroupData]);
-
-  const setGoal = useCallback(async (goal: Omit<PushupGoal, 'id' | 'createdAt'>) => {
-    await Storage.setGoal(goal);
-    await refresh();
-  }, [refresh]);
-
-  const logPushups = useCallback(async (count: number) => {
-    if (activeGroupId && activeGroup) {
-      const today = getTodayDateString();
-      await apiRequest("POST", "/api/logs", {
-        groupId: activeGroupId,
-        date: today,
-        count,
-      });
-      await fetchGroupData(activeGroupId);
-      queryClient.invalidateQueries({ queryKey: ['/api/groups', activeGroupId, 'leaderboard'] });
-    } else {
-      await Storage.logPushups(count);
-      const appData = await Storage.loadAppData();
-      setData(appData);
-    }
-  }, [activeGroupId, activeGroup, fetchGroupData]);
-
-  const updateLog = useCallback(async (date: string, count: number) => {
-    if (activeGroupId && activeGroup) {
-      await apiRequest("PUT", "/api/logs", {
-        groupId: activeGroupId,
-        date,
-        count,
-      });
-      await fetchGroupData(activeGroupId);
-      queryClient.invalidateQueries({ queryKey: ['/api/groups', activeGroupId, 'leaderboard'] });
-    } else {
-      await Storage.updateLogForDate(date, count);
-      const appData = await Storage.loadAppData();
-      setData(appData);
-    }
-  }, [activeGroupId, activeGroup, fetchGroupData]);
-
-  const deleteLog = useCallback(async (date: string) => {
-    if (activeGroupId && activeGroup) {
-      await apiRequest("DELETE", `/api/logs/${activeGroupId}/${date}`);
-      await fetchGroupData(activeGroupId);
-      queryClient.invalidateQueries({ queryKey: ['/api/groups', activeGroupId, 'leaderboard'] });
-    } else {
-      await Storage.deleteLogForDate(date);
-      const appData = await Storage.loadAppData();
-      setData(appData);
-    }
-  }, [activeGroupId, activeGroup, fetchGroupData]);
-
-  const updateReminders = useCallback(async (settings: ReminderSettings) => {
-    await Storage.updateReminderSettings(settings);
-    const appData = await Storage.loadAppData();
-    setData(appData);
   }, []);
 
-  const resetChallenge = useCallback(async () => {
-    if (activeGroupId) {
-      await setActiveGroupFn(null);
+  const setActiveChallenge = useCallback(async (challengeId: string | null) => {
+    if (challengeId) {
+      await AsyncStorage.setItem(ACTIVE_CHALLENGE_KEY, challengeId);
+      setActiveChallengeIdState(challengeId);
+      await fetchLogs(challengeId);
+    } else {
+      await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
+      setActiveChallengeIdState(null);
+      setLogs([]);
     }
-    await Storage.resetChallenge();
-    const appData = await Storage.loadAppData();
-    setData(appData);
-  }, [activeGroupId, setActiveGroupFn]);
+  }, [fetchLogs]);
 
-  const effectiveGoal: PushupGoal | null = useMemo(() => {
-    if (activeGroupId && activeGroup) {
-      let goalValue = activeGroup.totalGoal;
-      if (activeGroup.goalType === 'individual' && activeGroup.myIndividualGoal) {
-        goalValue = activeGroup.myIndividualGoal;
-      }
-      return {
-        id: activeGroup.id,
-        totalGoal: goalValue,
-        startDate: activeGroup.startDate,
-        endDate: activeGroup.endDate,
-        planType: 'average' as const,
-        createdAt: new Date().toISOString(),
-      };
+  const logActivity = useCallback(async (count: number) => {
+    if (!activeChallengeId) return;
+    const today = getTodayDateString();
+    await apiRequest("POST", "/api/logs", {
+      groupId: activeChallengeId,
+      date: today,
+      count,
+    });
+    await fetchLogs(activeChallengeId);
+    queryClient.invalidateQueries({ queryKey: ['/api/groups', activeChallengeId, 'leaderboard'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+  }, [activeChallengeId, fetchLogs]);
+
+  const updateLog = useCallback(async (date: string, count: number) => {
+    if (!activeChallengeId) return;
+    await apiRequest("PUT", "/api/logs", {
+      groupId: activeChallengeId,
+      date,
+      count,
+    });
+    await fetchLogs(activeChallengeId);
+    queryClient.invalidateQueries({ queryKey: ['/api/groups', activeChallengeId, 'leaderboard'] });
+  }, [activeChallengeId, fetchLogs]);
+
+  const deleteLog = useCallback(async (date: string) => {
+    if (!activeChallengeId) return;
+    await apiRequest("DELETE", `/api/logs/${activeChallengeId}/${date}`);
+    await fetchLogs(activeChallengeId);
+    queryClient.invalidateQueries({ queryKey: ['/api/groups', activeChallengeId, 'leaderboard'] });
+  }, [activeChallengeId, fetchLogs]);
+
+  const createPersonalChallenge = useCallback(async (data: {
+    name: string;
+    exerciseType: string;
+    totalGoal: number;
+    startDate: string;
+    endDate: string;
+  }): Promise<Challenge> => {
+    const res = await apiRequest("POST", "/api/challenges/personal", data);
+    const challenge = await res.json();
+    await fetchChallenges();
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+    return challenge;
+  }, [fetchChallenges]);
+
+  const deleteChallengeAction = useCallback(async (challengeId: string) => {
+    await apiRequest("DELETE", `/api/challenges/${challengeId}`);
+    if (activeChallengeId === challengeId) {
+      await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
+      setActiveChallengeIdState(null);
+      setLogs([]);
     }
-    return data.goal;
-  }, [activeGroupId, activeGroup, data.goal]);
-
-  const effectiveLogs = useMemo(() => {
-    if (activeGroupId && activeGroup) {
-      return serverLogs;
-    }
-    return data.logs;
-  }, [activeGroupId, activeGroup, serverLogs, data.logs]);
-
-  const progress = useMemo(() => {
-    if (!effectiveGoal) return null;
-    return Storage.calculateProgress(effectiveGoal, effectiveLogs);
-  }, [effectiveGoal, effectiveLogs]);
+    await fetchChallenges();
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+  }, [activeChallengeId, fetchChallenges]);
 
   const value = useMemo(() => ({
     isLoading,
-    goal: effectiveGoal,
-    logs: effectiveLogs,
-    reminderSettings: data.reminderSettings,
+    challenges,
+    activeChallengeId,
+    activeChallenge,
+    logs,
     progress,
-    activeGroupId,
-    activeGroup,
-    setGoal,
-    logPushups,
+    setActiveChallenge,
+    logActivity,
     updateLog,
     deleteLog,
-    updateReminders,
-    resetChallenge,
     refresh,
-    setActiveGroup: setActiveGroupFn,
-  }), [isLoading, effectiveGoal, effectiveLogs, data.reminderSettings, progress, activeGroupId, activeGroup, setGoal, logPushups, updateLog, deleteLog, updateReminders, resetChallenge, refresh, setActiveGroupFn]);
+    createPersonalChallenge,
+    deleteChallenge: deleteChallengeAction,
+  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction]);
 
   return (
     <PushupContext.Provider value={value}>

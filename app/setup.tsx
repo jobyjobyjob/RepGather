@@ -4,19 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { format, endOfMonth, differenceInDays, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
+import { format, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
-import { PlanType } from '@/lib/types';
+import { EXERCISE_TYPES } from '@shared/schema';
 
 const PRESET_GOALS = [1000, 2000, 5000, 10000];
-
-const PLAN_OPTIONS: { type: PlanType; label: string; description: string }[] = [
-  { type: 'average', label: 'Average', description: 'Same amount each day' },
-  { type: 'increasing', label: 'Increasing', description: 'More each week' },
-  { type: 'custom', label: 'Custom', description: 'Fixed daily target' },
-];
 
 function generateMonthOptions() {
   const options = [];
@@ -39,16 +33,18 @@ export default function SetupScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { setGoal } = usePushups();
+  const { createPersonalChallenge, setActiveChallenge } = usePushups();
 
   const monthOptions = generateMonthOptions();
+  const [challengeName, setChallengeName] = useState('');
   const [goalAmount, setGoalAmount] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
   const [startDay, setStartDay] = useState(1);
   const [endDay, setEndDay] = useState(monthOptions[0].daysInMonth);
-  const [planType, setPlanType] = useState<PlanType>('average');
-  const [customDailyTarget, setCustomDailyTarget] = useState('');
+  const [exerciseType, setExerciseType] = useState('Push-ups');
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedMonth = monthOptions[selectedMonthIndex];
   const daysArray = useMemo(() => {
@@ -86,48 +82,44 @@ export default function SetupScreen() {
     setSelectedPreset(PRESET_GOALS.includes(num) ? num : null);
   };
 
-  const handleCustomTargetChange = (text: string) => {
-    const numericText = text.replace(/[^0-9]/g, '');
-    if (numericText === '' || numericText === '0') {
-      setCustomDailyTarget('');
-      return;
-    }
-    setCustomDailyTarget(numericText.replace(/^0+/, '') || '');
-  };
-
   const handleStartChallenge = async () => {
     const amount = parseInt(goalAmount, 10);
     if (!amount || amount < 1 || totalDays < 1) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
-    if (planType === 'custom' && !customDailyTarget) {
+
+    setIsSubmitting(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const name = challengeName.trim() || `${exerciseType} Challenge`;
+
+      const challenge = await createPersonalChallenge({
+        name,
+        exerciseType,
+        totalGoal: amount,
+        startDate: startDateStr,
+        endDate: endDateStr,
+      });
+
+      await setActiveChallenge(challenge.id);
+      router.back();
+    } catch (err) {
+      console.error('Failed to create challenge:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
     }
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    await setGoal({
-      totalGoal: amount,
-      startDate: startDateStr,
-      endDate: endDateStr,
-      planType,
-      customDailyTarget: planType === 'custom' ? parseInt(customDailyTarget, 10) : undefined,
-    });
-
-    router.back();
+    setIsSubmitting(false);
   };
 
   const dailyAverage = goalAmount && totalDays > 0
     ? Math.ceil(parseInt(goalAmount, 10) / totalDays)
     : 0;
 
-  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && totalDays >= 1 &&
-    (planType !== 'custom' || (customDailyTarget && parseInt(customDailyTarget, 10) > 0));
+  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && totalDays >= 1 && !isSubmitting;
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -143,7 +135,7 @@ export default function SetupScreen() {
           <Ionicons name="close" size={24} color={colors.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-          Set Your Goal
+          New Personal Challenge
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -156,7 +148,59 @@ export default function SetupScreen() {
       >
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            How many push-ups?
+            Challenge Name
+          </Text>
+          <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              style={[styles.nameInput, { color: colors.text, fontFamily: 'Inter_500Medium' }]}
+              value={challengeName}
+              onChangeText={setChallengeName}
+              placeholder={`e.g., ${exerciseType} Challenge`}
+              placeholderTextColor={colors.textSecondary}
+              maxLength={40}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Exercise Type
+          </Text>
+          <Pressable
+            onPress={() => setShowExercisePicker(!showExercisePicker)}
+            style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'row', alignItems: 'center' }]}
+          >
+            <Ionicons name="fitness" size={20} color={colors.tint} style={{ marginRight: 10 }} />
+            <Text style={[styles.nameInput, { color: colors.text, fontFamily: 'Inter_500Medium', flex: 1 }]}>{exerciseType}</Text>
+            <Ionicons name={showExercisePicker ? "chevron-up" : "chevron-down"} size={20} color={colors.textSecondary} />
+          </Pressable>
+          {showExercisePicker && (
+            <View style={[styles.pickerDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                {EXERCISE_TYPES.map((type) => (
+                  <Pressable
+                    key={type}
+                    style={[
+                      styles.pickerItem,
+                      exerciseType === type && { backgroundColor: colors.tint + '15' },
+                    ]}
+                    onPress={() => {
+                      setExerciseType(type);
+                      setShowExercisePicker(false);
+                    }}
+                  >
+                    <Text style={[styles.pickerItemText, { color: exerciseType === type ? colors.tint : colors.text }]}>{type}</Text>
+                    {exerciseType === type && <Ionicons name="checkmark" size={18} color={colors.tint} />}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Total Goal
           </Text>
           <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
@@ -169,7 +213,7 @@ export default function SetupScreen() {
               maxLength={7}
             />
             <Text style={[styles.inputSuffix, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-              push-ups
+              {exerciseType.toLowerCase()}
             </Text>
           </View>
           <View style={styles.presetRow}>
@@ -328,75 +372,12 @@ export default function SetupScreen() {
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            Daily Plan
-          </Text>
-          <View style={styles.planOptions}>
-            {PLAN_OPTIONS.map((option) => (
-              <Pressable
-                key={option.type}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setPlanType(option.type);
-                }}
-                style={({ pressed }) => [
-                  styles.planOption,
-                  {
-                    backgroundColor: planType === option.type ? colors.tint + '15' : colors.card,
-                    borderColor: planType === option.type ? colors.tint : colors.border,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <View style={styles.planRadio}>
-                  <View style={[styles.radioOuter, { borderColor: planType === option.type ? colors.tint : colors.textSecondary }]}>
-                    {planType === option.type && (
-                      <View style={[styles.radioInner, { backgroundColor: colors.tint }]} />
-                    )}
-                  </View>
-                </View>
-                <View style={styles.planContent}>
-                  <Text style={[styles.planLabel, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                    {option.label}
-                  </Text>
-                  <Text style={[styles.planDescription, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                    {option.description}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-
-          {planType === 'custom' && (
-            <View style={[styles.customInputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TextInput
-                style={[styles.customInput, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}
-                value={customDailyTarget}
-                onChangeText={handleCustomTargetChange}
-                placeholder="Daily target"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="number-pad"
-                maxLength={4}
-              />
-              <Text style={[styles.inputSuffix, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-                per day
-              </Text>
-            </View>
-          )}
-        </View>
-
         {isValid && (
           <View style={[styles.summaryCard, { backgroundColor: colors.tint + '15' }]}>
             <View style={styles.summaryRow}>
               <Ionicons name="calculator" size={20} color={colors.tint} />
               <Text style={[styles.summaryText, { color: colors.text, fontFamily: 'Inter_500Medium' }]}>
-                {planType === 'custom'
-                  ? `Fixed target: ${customDailyTarget} push-ups/day`
-                  : planType === 'increasing'
-                  ? `Starts at ~${Math.ceil(dailyAverage * 0.7)}, builds to ~${Math.ceil(dailyAverage * 1.5)}/day`
-                  : `About ${dailyAverage} push-ups per day`
-                }
+                About {dailyAverage} {exerciseType.toLowerCase()} per day
               </Text>
             </View>
             <Text style={[styles.summarySubtext, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
@@ -437,6 +418,7 @@ const styles = StyleSheet.create({
   section: { gap: 12 },
   sectionTitle: { fontSize: 18 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 16 },
+  nameInput: { fontSize: 16, paddingVertical: 0 },
   input: { flex: 1, fontSize: 28, paddingVertical: 0 },
   inputSuffix: { fontSize: 16, marginLeft: 8 },
   presetRow: { flexDirection: 'row', gap: 10 },
@@ -450,16 +432,9 @@ const styles = StyleSheet.create({
   dayButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dayButtonText: { fontSize: 15 },
   dateHint: { fontSize: 13, textAlign: 'center', marginTop: 4 },
-  planOptions: { gap: 10 },
-  planOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 14, borderWidth: 1, gap: 14 },
-  planRadio: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center' },
-  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  radioInner: { width: 12, height: 12, borderRadius: 6 },
-  planContent: { flex: 1, gap: 2 },
-  planLabel: { fontSize: 16 },
-  planDescription: { fontSize: 13 },
-  customInputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 14, marginTop: 4 },
-  customInput: { flex: 1, fontSize: 20, paddingVertical: 0 },
+  pickerDropdown: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  pickerItemText: { fontSize: 15 },
   summaryCard: { padding: 18, borderRadius: 14, gap: 6 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   summaryText: { fontSize: 15, flex: 1 },

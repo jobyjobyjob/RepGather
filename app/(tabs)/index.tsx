@@ -7,13 +7,68 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
 
 import Colors from '@/constants/colors';
-import { usePushups } from '@/contexts/PushupContext';
+import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CounterButton } from '@/components/CounterButton';
-import { StatCard } from '@/components/StatCard';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
 import { MonthCalendar } from '@/components/MonthCalendar';
+
+function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
+  challenges: Challenge[];
+  activeChallengeId: string | null;
+  onSelect: (id: string) => void;
+  colors: any;
+}) {
+  if (challenges.length === 0) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.challengePickerContent}
+      style={styles.challengePickerScroll}
+    >
+      {challenges.map((challenge) => {
+        const isActive = challenge.id === activeChallengeId;
+        return (
+          <Pressable
+            key={challenge.id}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(challenge.id);
+            }}
+            style={[
+              styles.challengeChip,
+              {
+                backgroundColor: isActive ? colors.tint : colors.card,
+                borderColor: isActive ? colors.tint : colors.border,
+              },
+            ]}
+          >
+            <Ionicons
+              name={challenge.isPersonal ? "person" : "people"}
+              size={14}
+              color={isActive ? '#FFFFFF' : colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.challengeChipText,
+                {
+                  color: isActive ? '#FFFFFF' : colors.text,
+                  fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {challenge.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
 
 export default function TodayScreen() {
   const colorScheme = useColorScheme();
@@ -21,7 +76,10 @@ export default function TodayScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, goal, logs, progress, logPushups, activeGroupId, activeGroup, setActiveGroup } = usePushups();
+  const {
+    isLoading, challenges, activeChallengeId, activeChallenge,
+    logs, progress, logActivity, setActiveChallenge,
+  } = usePushups();
   const { user } = useAuth();
   const [dayFinished, setDayFinished] = useState(false);
 
@@ -31,14 +89,14 @@ export default function TodayScreen() {
   }));
 
   const handleIncrement = () => {
-    logPushups(1);
+    logActivity(1);
   };
 
   const handleQuickAdd = (count: number) => {
-    logPushups(count);
+    logActivity(count);
   };
 
-  const exerciseLabel = activeGroup?.exerciseType?.toLowerCase() || 'push-ups';
+  const exerciseLabel = activeChallenge?.exerciseType?.toLowerCase() || 'reps';
 
   const getEncouragementMessage = () => {
     const todayDone = progress?.todayCount || 0;
@@ -88,6 +146,11 @@ export default function TodayScreen() {
     );
   };
 
+  const handleChallengeSelect = (id: string) => {
+    setDayFinished(false);
+    setActiveChallenge(id);
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -96,7 +159,7 @@ export default function TodayScreen() {
     );
   }
 
-  if (!goal) {
+  if (challenges.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.emptyState, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) }]}>
@@ -104,10 +167,10 @@ export default function TodayScreen() {
             <Ionicons name="fitness" size={48} color={colors.tint} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-            Start Your Challenge
+            Start Your First Challenge
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-            Set a fitness goal and track your progress towards becoming stronger every day.
+            Create a personal challenge or join a group to start tracking your fitness goals.
           </Text>
           <Pressable
             onPress={() => router.push('/setup')}
@@ -117,7 +180,7 @@ export default function TodayScreen() {
               pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
             ]}
           >
-            <Text style={[styles.startButtonText, { fontFamily: 'Inter_600SemiBold' }]}>Set Your Goal</Text>
+            <Text style={[styles.startButtonText, { fontFamily: 'Inter_600SemiBold' }]}>Create Challenge</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </Pressable>
         </View>
@@ -125,20 +188,55 @@ export default function TodayScreen() {
     );
   }
 
-  const dynamicTarget = progress?.dynamicDailyTarget || 0;
-  const planTarget = progress?.planDailyTarget || 0;
-  const todayCount = progress?.todayCount || 0;
-  
-  const primaryTarget = dynamicTarget;
-  const todayProgress = primaryTarget > 0 ? Math.min(100, (todayCount / primaryTarget) * 100) : 0;
-  const todayComplete = todayCount >= primaryTarget;
+  if (!activeChallenge) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 16),
+              paddingBottom: Platform.OS === 'web' ? 118 : 100,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.greeting, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+              {getGreeting()}{user ? `, ${user.displayName}` : ''}
+            </Text>
+            <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              Select a challenge
+            </Text>
+          </View>
 
-  const getPlanTypeLabel = () => {
-    if (goal.planType === 'average') return 'Average';
-    if (goal.planType === 'increasing') return 'Increasing';
-    if (goal.planType === 'custom') return 'Custom';
-    return '';
-  };
+          <ChallengePicker
+            challenges={challenges}
+            activeChallengeId={null}
+            onSelect={handleChallengeSelect}
+            colors={colors}
+          />
+
+          <View style={[styles.selectPromptCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="hand-left-outline" size={32} color={colors.textSecondary} />
+            <Text style={[styles.selectPromptText, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+              Tap a challenge above to start tracking
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const goalValue = activeChallenge.goalType === 'individual' && activeChallenge.myIndividualGoal
+    ? activeChallenge.myIndividualGoal
+    : activeChallenge.totalGoal;
+
+  const dynamicTarget = progress?.dynamicDailyTarget || 0;
+  const todayCount = progress?.todayCount || 0;
+  const todayProgress = dynamicTarget > 0 ? Math.min(100, (todayCount / dynamicTarget) * 100) : 0;
+  const todayComplete = dynamicTarget > 0 && todayCount >= dynamicTarget;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -146,7 +244,7 @@ export default function TodayScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { 
+          {
             paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 16),
             paddingBottom: Platform.OS === 'web' ? 118 : 100,
           },
@@ -160,23 +258,14 @@ export default function TodayScreen() {
           <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
             {todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
           </Text>
-          {activeGroup && (
-            <View style={styles.groupBanner}>
-              <View style={[styles.groupBannerContent, { backgroundColor: colors.tint + '15' }]}>
-                <Ionicons name="people" size={16} color={colors.tint} />
-                <Text style={[styles.groupBannerText, { color: colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
-                  {activeGroup.name}
-                </Text>
-                <Pressable
-                  onPress={() => setActiveGroup(null)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="close-circle" size={18} color={colors.tint} />
-                </Pressable>
-              </View>
-            </View>
-          )}
         </View>
+
+        <ChallengePicker
+          challenges={challenges}
+          activeChallengeId={activeChallengeId}
+          onSelect={handleChallengeSelect}
+          colors={colors}
+        />
 
         <View style={styles.progressSection}>
           <ProgressRing
@@ -194,7 +283,7 @@ export default function TodayScreen() {
             </Text>
           </ProgressRing>
           <Text style={[styles.totalProgress, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            {progress?.totalCompleted.toLocaleString()} / {goal.totalGoal.toLocaleString()} {exerciseLabel}
+            {progress?.totalCompleted.toLocaleString()} / {goalValue.toLocaleString()} {exerciseLabel}
           </Text>
         </View>
 
@@ -209,36 +298,17 @@ export default function TodayScreen() {
               </Text>
             </View>
           </View>
-          
-          <View style={styles.targetDetails}>
-            <View style={styles.targetRow}>
-              <Text style={[styles.targetLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Dynamic (to stay on track)
-              </Text>
-              <Text style={[styles.targetValue, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                {dynamicTarget}
-              </Text>
-            </View>
-            <View style={styles.targetRow}>
-              <Text style={[styles.targetLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Plan ({getPlanTypeLabel()})
-              </Text>
-              <Text style={[styles.targetValue, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                {planTarget}
-              </Text>
-            </View>
-          </View>
-          
+
           <View style={styles.todayProgressBar}>
             <View style={[styles.progressTrack, { backgroundColor: colors.progressBackground }]}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
-                  { 
+                  styles.progressFill,
+                  {
                     backgroundColor: todayComplete ? colors.success : colors.tint,
                     width: `${Math.min(100, todayProgress)}%`,
                   }
-                ]} 
+                ]}
               />
             </View>
             <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
@@ -268,21 +338,21 @@ export default function TodayScreen() {
               onPress={handleFinishDay}
               style={({ pressed }) => [
                 styles.finishButton,
-                { 
+                {
                   backgroundColor: dayFinished ? colors.success : colors.card,
                   borderColor: dayFinished ? colors.success : colors.success,
                 },
                 pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
               ]}
             >
-              <Ionicons 
-                name={dayFinished ? "checkmark-circle" : "checkmark-circle-outline"} 
-                size={24} 
-                color={dayFinished ? '#FFFFFF' : colors.success} 
+              <Ionicons
+                name={dayFinished ? "checkmark-circle" : "checkmark-circle-outline"}
+                size={24}
+                color={dayFinished ? '#FFFFFF' : colors.success}
               />
               <Text style={[
-                styles.finishButtonText, 
-                { 
+                styles.finishButtonText,
+                {
                   color: dayFinished ? '#FFFFFF' : colors.success,
                   fontFamily: 'Inter_600SemiBold',
                 }
@@ -294,27 +364,38 @@ export default function TodayScreen() {
         )}
 
         <View style={styles.statsRow}>
-          <StatCard
-            icon="flame"
-            label="Streak"
-            value={`${progress?.streak || 0} days`}
-            accentColor={colors.accent}
-            backgroundColor={colors.card}
-            textColor={colors.text}
-            textSecondary={colors.textSecondary}
-          />
-          <StatCard
-            icon="time"
-            label="Days Left"
-            value={progress?.daysRemaining || 0}
-            accentColor={colors.tint}
-            backgroundColor={colors.card}
-            textColor={colors.text}
-            textSecondary={colors.textSecondary}
-          />
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="flame" size={22} color={colors.accent} />
+            <Text style={[styles.statValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {progress?.streak || 0} days
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Streak
+            </Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="time" size={22} color={colors.tint} />
+            <Text style={[styles.statValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {progress?.daysRemaining || 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Days Left
+            </Text>
+          </View>
         </View>
 
-        <MonthCalendar goal={goal} logs={logs} colors={colors} />
+        <MonthCalendar
+          goal={{
+            id: activeChallenge.id,
+            totalGoal: goalValue,
+            startDate: activeChallenge.startDate,
+            endDate: activeChallenge.endDate,
+            planType: 'average' as const,
+            createdAt: '',
+          }}
+          logs={logs.map(l => ({ ...l, createdAt: '' }))}
+          colors={colors}
+        />
       </ScrollView>
     </View>
   );
@@ -352,20 +433,35 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
   },
-  groupBanner: {
-    marginTop: 8,
+  challengePickerScroll: {
+    marginHorizontal: -20,
   },
-  groupBannerContent: {
+  challengePickerContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  challengeChip: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
-    alignSelf: 'flex-start' as const,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  groupBannerText: {
+  challengeChipText: {
     fontSize: 14,
+    maxWidth: 120,
+  },
+  selectPromptCard: {
+    padding: 32,
+    borderRadius: 20,
+    alignItems: 'center' as const,
+    gap: 12,
+  },
+  selectPromptText: {
+    fontSize: 15,
+    textAlign: 'center' as const,
   },
   progressSection: {
     alignItems: 'center',
@@ -402,20 +498,6 @@ const styles = StyleSheet.create({
   targetText: {
     fontSize: 14,
   },
-  targetDetails: {
-    gap: 8,
-  },
-  targetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  targetLabel: {
-    fontSize: 14,
-  },
-  targetValue: {
-    fontSize: 16,
-  },
   todayProgressBar: {
     gap: 8,
   },
@@ -435,6 +517,19 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  statValue: {
+    fontSize: 20,
+  },
+  statLabel: {
+    fontSize: 12,
   },
   emptyState: {
     flex: 1,

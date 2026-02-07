@@ -16,8 +16,9 @@ export default function EditLogScreen() {
   const insets = useSafeAreaInsets();
 
   const { date } = useLocalSearchParams<{ date: string }>();
-  const { logs, updateLog, deleteLog } = usePushups();
+  const { logs, updateLog, deleteLog, activeChallenge } = usePushups();
 
+  const exerciseLabel = activeChallenge?.exerciseType?.toLowerCase() || 'reps';
   const existingLog = logs.find(log => log.date === date);
   const [count, setCount] = useState(existingLog?.count.toString() || '');
 
@@ -63,10 +64,9 @@ export default function EditLogScreen() {
   };
 
   const formattedDate = date ? format(parseISO(date), 'EEEE, MMMM d, yyyy') : '';
-  const displayCount = count || '0';
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -97,7 +97,7 @@ export default function EditLogScreen() {
 
         <View style={styles.inputSection}>
           <Text style={[styles.label, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            Reps completed
+            {exerciseLabel} completed
           </Text>
           <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
@@ -167,102 +167,23 @@ export default function EditLogScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    gap: 24,
-  },
-  dateCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-  },
-  dateText: {
-    fontSize: 16,
-  },
-  inputSection: {
-    gap: 12,
-  },
-  label: {
-    fontSize: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  inputContainer: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  input: {
-    fontSize: 48,
-    textAlign: 'center',
-    width: '100%',
-    paddingVertical: 0,
-  },
-  quickButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  quickButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  quickButtonText: {
-    fontSize: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-  },
-  deleteButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-  },
-  saveButtonText: {
-    fontSize: 18,
-    color: '#FFFFFF',
-  },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16 },
+  closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18 },
+  placeholder: { width: 40 },
+  content: { flex: 1, paddingHorizontal: 20, gap: 24 },
+  dateCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16 },
+  dateText: { fontSize: 16 },
+  inputSection: { gap: 12 },
+  label: { fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
+  inputContainer: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' },
+  input: { fontSize: 48, textAlign: 'center', width: '100%', paddingVertical: 0 },
+  quickButtons: { flexDirection: 'row', gap: 10 },
+  quickButton: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  quickButtonText: { fontSize: 16 },
+  footer: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 16, gap: 12 },
+  deleteButton: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  saveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, paddingHorizontal: 32, borderRadius: 30 },
+  saveButtonText: { fontSize: 18, color: '#FFFFFF' },
 });

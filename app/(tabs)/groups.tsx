@@ -26,6 +26,7 @@ interface GroupData {
   startDate: string;
   endDate: string;
   createdBy: string;
+  isPersonal: boolean;
   myIndividualGoal?: number | null;
 }
 
@@ -53,7 +54,7 @@ export default function GroupsScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { activeGroupId, setActiveGroup: setActiveGroupCtx } = usePushups();
+  const { activeChallengeId, setActiveChallenge: setActiveGroupCtx } = usePushups();
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null);
@@ -227,7 +228,8 @@ export default function GroupsScreen() {
   };
 
   const renderGroupList = () => {
-    const groups = groupsQuery.data || [];
+    const allGroups = groupsQuery.data || [];
+    const groups = allGroups.filter(g => !g.isPersonal);
 
     return (
       <ScrollView
@@ -274,7 +276,7 @@ export default function GroupsScreen() {
         ) : (
           groups.map((group) => {
             const totalDays = differenceInDays(parseISO(group.endDate), parseISO(group.startDate)) + 1;
-            const isActive = activeGroupId === group.id;
+            const isActive = activeChallengeId === group.id;
             const goalDisplay = group.goalType === 'individual'
               ? (group.myIndividualGoal ? `${group.myIndividualGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}` : 'Set your goal')
               : `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}`;
@@ -771,7 +773,7 @@ export default function GroupsScreen() {
           </View>
         )}
 
-        {activeGroupId === selectedGroup.id ? (
+        {activeChallengeId === selectedGroup.id ? (
           <View style={[styles.activeGroupBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
             <Text style={[styles.activeGroupText, { color: colors.success }]}>
