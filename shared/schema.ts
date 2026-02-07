@@ -24,6 +24,7 @@ export const groups = pgTable("groups", {
   totalGoal: integer("total_goal").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
+  isPersonal: boolean("is_personal").notNull().default(false),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
