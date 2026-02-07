@@ -58,8 +58,8 @@ export default function SettingsScreen() {
       
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Time for Push-ups!',
-          body: `You have ${progress?.dynamicDailyTarget || 0} push-ups to do today. Let's go!`,
+          title: 'Time to train!',
+          body: `You have ${progress?.dynamicDailyTarget || 0} reps to do today. Let's go!`,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -307,7 +307,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-            PushUp Pro v1.0.0
+            GritGather v1.0.0
           </Text>
         </View>
       </ScrollView>

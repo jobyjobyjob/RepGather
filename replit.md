@@ -1,8 +1,8 @@
-# PushUp Pro
+# GritGather
 
 ## Overview
 
-PushUp Pro is a mobile fitness tracking application built with Expo/React Native that helps users set and achieve push-up goals over a defined time period. The app supports both solo challenges (local storage) and group challenges (server-backed with PostgreSQL). Users can create/join groups with invite codes, share progress, and compete on a leaderboard. It supports iOS, Android, and web platforms.
+GritGather is a generic fitness tracking application built with Expo/React Native that supports multiple exercise types (push-ups, sit-ups, squats, running, etc.). Users can set fitness goals over defined time periods, create/join groups with invite codes, share progress, and compete on a leaderboard. Groups support both shared group goals and individual member goals. The app uses solo mode (local storage) and group mode (server-backed with PostgreSQL). It supports iOS, Android, and web platforms.
 
 ## User Preferences
 
@@ -89,6 +89,13 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple, bcrypt
 
 ## Recent Changes
+- 2026-02-07: Renamed app from PushUp Pro to GritGather
+- 2026-02-07: Added exercise type selection (12 types: push-ups, sit-ups, squats, running, etc.)
+- 2026-02-07: Implemented individual vs group goal system with toggle in group creation
+- 2026-02-07: Enhanced leaderboard with exercise-specific unit labels and percentage display
+- 2026-02-07: Added contextual encouragement messages with emojis when logging activity
+- 2026-02-07: Updated schema with exerciseType, goalType, individualGoal fields
+- 2026-02-07: Dynamic exercise labels in Today tab based on active group exercise type
 - 2026-02-07: Added user authentication (register/login/logout)
 - 2026-02-07: Added Groups tab with create, join, leaderboard functionality
 - 2026-02-07: Connected Today tab to server data for group mode tracking

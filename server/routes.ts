@@ -27,7 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pool: pool,
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "pushup-pro-secret-key",
+      secret: process.env.SESSION_SECRET || "gritgather-secret-key",
       resave: false,
       saveUninitialized: false,
       cookie: {

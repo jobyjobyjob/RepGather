@@ -97,7 +97,7 @@ export default function EditLogScreen() {
 
         <View style={styles.inputSection}>
           <Text style={[styles.label, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            Push-ups completed
+            Reps completed
           </Text>
           <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput

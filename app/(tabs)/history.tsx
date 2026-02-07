@@ -81,7 +81,7 @@ export default function HistoryScreen() {
                 {progress?.totalCompleted.toLocaleString() || 0}
               </Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Total Push-ups
+                Total Reps
               </Text>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />

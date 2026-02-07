@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "PushUp Pro",
-    "slug": "pushup-pro",
+    "name": "GritGather",
+    "slug": "gritgather",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pushuppro",
+    "scheme": "gritgather",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
