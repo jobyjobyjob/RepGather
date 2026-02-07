@@ -12,6 +12,7 @@ import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePushups } from '@/contexts/PushupContext';
 import { apiRequest, queryClient } from '@/lib/query-client';
+import { EXERCISE_TYPES } from '@shared/schema';
 
 type ViewMode = 'list' | 'create' | 'join' | 'detail';
 
@@ -19,10 +20,13 @@ interface GroupData {
   id: string;
   name: string;
   inviteCode: string;
+  exerciseType: string;
+  goalType: string;
   totalGoal: number;
   startDate: string;
   endDate: string;
   createdBy: string;
+  myIndividualGoal?: number | null;
 }
 
 interface LeaderboardEntry {
@@ -30,12 +34,17 @@ interface LeaderboardEntry {
   userId: string;
   displayName: string;
   totalCount: number;
+  individualGoal: number | null;
+  groupGoal: number;
+  exerciseType: string;
+  goalType: string;
 }
 
 interface MemberData {
   id: string;
   username: string;
   displayName: string;
+  individualGoal: number | null;
 }
 
 export default function GroupsScreen() {
@@ -51,9 +60,14 @@ export default function GroupsScreen() {
 
   const [groupName, setGroupName] = useState('');
   const [groupGoal, setGroupGoal] = useState('');
+  const [exerciseType, setExerciseType] = useState('Push-ups');
+  const [goalType, setGoalType] = useState<'group' | 'individual'>('group');
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [createError, setCreateError] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [individualGoalInput, setIndividualGoalInput] = useState('');
+  const [showSetGoal, setShowSetGoal] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [startDay, setStartDay] = useState(1);
@@ -84,7 +98,7 @@ export default function GroupsScreen() {
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: async (data: { name: string; totalGoal: number; startDate: string; endDate: string }) => {
+    mutationFn: async (data: { name: string; exerciseType: string; goalType: string; totalGoal: number; startDate: string; endDate: string }) => {
       const res = await apiRequest("POST", "/api/groups", data);
       return res.json();
     },
@@ -93,6 +107,8 @@ export default function GroupsScreen() {
       setViewMode('list');
       setGroupName('');
       setGroupGoal('');
+      setExerciseType('Push-ups');
+      setGoalType('group');
       setCreateError('');
     },
     onError: (err: any) => {
@@ -133,13 +149,26 @@ export default function GroupsScreen() {
     },
   });
 
+  const setIndividualGoalMutation = useMutation({
+    mutationFn: async ({ groupId, goal }: { groupId: string; goal: number }) => {
+      await apiRequest("PUT", `/api/groups/${groupId}/individual-goal`, { goal });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/groups', selectedGroup?.id, 'leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/groups', selectedGroup?.id, 'members'] });
+      setShowSetGoal(false);
+      setIndividualGoalInput('');
+    },
+  });
+
   const handleCreateGroup = () => {
     if (!groupName.trim()) {
       setCreateError('Enter a group name');
       return;
     }
     const goal = parseInt(groupGoal);
-    if (!goal || goal < 1) {
+    if (goalType === 'group' && (!goal || goal < 1)) {
       setCreateError('Enter a valid goal');
       return;
     }
@@ -150,7 +179,14 @@ export default function GroupsScreen() {
     const sd = format(startDate, 'yyyy-MM-dd');
     const ed = format(endDate, 'yyyy-MM-dd');
 
-    createGroupMutation.mutate({ name: groupName.trim(), totalGoal: goal, startDate: sd, endDate: ed });
+    createGroupMutation.mutate({
+      name: groupName.trim(),
+      exerciseType,
+      goalType,
+      totalGoal: goalType === 'individual' ? 0 : goal,
+      startDate: sd,
+      endDate: ed,
+    });
   };
 
   const handleJoinGroup = () => {
@@ -162,17 +198,28 @@ export default function GroupsScreen() {
   };
 
   const handleLeaveGroup = (group: GroupData) => {
-    Alert.alert('Leave Group', `Leave "${group.name}"? Your push-up data for this group will be removed.`, [
+    Alert.alert('Leave Group', `Leave "${group.name}"? Your data for this group will be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: () => leaveGroupMutation.mutate(group.id) },
     ]);
   };
 
+  const handleSetIndividualGoal = () => {
+    const goal = parseInt(individualGoalInput);
+    if (!goal || goal < 1 || !selectedGroup) return;
+    setIndividualGoalMutation.mutate({ groupId: selectedGroup.id, goal });
+  };
+
   const openGroup = (group: GroupData) => {
     setSelectedGroup(group);
     setViewMode('detail');
+    setShowSetGoal(false);
     queryClient.invalidateQueries({ queryKey: ['/api/groups', group.id, 'leaderboard'] });
     queryClient.invalidateQueries({ queryKey: ['/api/groups', group.id, 'members'] });
+  };
+
+  const getExerciseUnit = (type: string) => {
+    return type.toLowerCase();
   };
 
   const renderGroupList = () => {
@@ -224,6 +271,9 @@ export default function GroupsScreen() {
           groups.map((group) => {
             const totalDays = differenceInDays(parseISO(group.endDate), parseISO(group.startDate)) + 1;
             const isActive = activeGroupId === group.id;
+            const goalDisplay = group.goalType === 'individual'
+              ? (group.myIndividualGoal ? `${group.myIndividualGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}` : 'Set your goal')
+              : `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}`;
             return (
               <TouchableOpacity
                 key={group.id}
@@ -244,15 +294,20 @@ export default function GroupsScreen() {
                       {group.name}{isActive ? ' (Active)' : ''}
                     </Text>
                     <Text style={[styles.groupMeta, { color: colors.textSecondary }]}>
-                      {group.totalGoal.toLocaleString()} push-ups in {totalDays} days
+                      {goalDisplay} in {totalDays} days
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                 </View>
                 <View style={[styles.groupCardFooter, { borderTopColor: colors.border }]}>
-                  <Text style={[styles.groupDateRange, { color: colors.textSecondary }]}>
-                    {format(parseISO(group.startDate), 'MMM d')} - {format(parseISO(group.endDate), 'MMM d, yyyy')}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.groupDateRange, { color: colors.textSecondary }]}>
+                      {format(parseISO(group.startDate), 'MMM d')} - {format(parseISO(group.endDate), 'MMM d, yyyy')}
+                    </Text>
+                    <View style={[styles.exerciseBadge, { backgroundColor: colors.tint + '15' }]}>
+                      <Text style={[styles.exerciseBadgeText, { color: colors.tint }]}>{group.exerciseType}</Text>
+                    </View>
+                  </View>
                   <View style={[styles.codeBadge, { backgroundColor: colors.tint + '15' }]}>
                     <Text style={[styles.codeText, { color: colors.tint }]}>{group.inviteCode}</Text>
                   </View>
@@ -294,18 +349,96 @@ export default function GroupsScreen() {
         />
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL GOAL (PUSH-UPS)</Text>
-      <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TextInput
-          style={[styles.input, { color: colors.text }]}
-          placeholder="e.g., 1000"
-          placeholderTextColor={colors.textSecondary}
-          value={groupGoal}
-          onChangeText={setGroupGoal}
-          keyboardType="number-pad"
-          testID="group-goal-input"
-        />
+      <Text style={[styles.label, { color: colors.textSecondary }]}>EXERCISE TYPE</Text>
+      <TouchableOpacity
+        style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'row', alignItems: 'center' }]}
+        onPress={() => setShowExercisePicker(!showExercisePicker)}
+        testID="exercise-type-picker"
+      >
+        <Ionicons name="fitness" size={20} color={colors.tint} style={{ marginRight: 10 }} />
+        <Text style={[styles.input, { color: colors.text, flex: 1 }]}>{exerciseType}</Text>
+        <Ionicons name={showExercisePicker ? "chevron-up" : "chevron-down"} size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      {showExercisePicker && (
+        <View style={[styles.pickerDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+            {EXERCISE_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.pickerItem,
+                  exerciseType === type && { backgroundColor: colors.tint + '15' },
+                ]}
+                onPress={() => {
+                  setExerciseType(type);
+                  setShowExercisePicker(false);
+                }}
+              >
+                <Text style={[
+                  styles.pickerItemText,
+                  { color: exerciseType === type ? colors.tint : colors.text },
+                ]}>{type}</Text>
+                {exerciseType === type && <Ionicons name="checkmark" size={18} color={colors.tint} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <Text style={[styles.label, { color: colors.textSecondary }]}>GOAL TYPE</Text>
+      <View style={styles.goalTypeRow}>
+        <TouchableOpacity
+          style={[
+            styles.goalTypeChip,
+            { borderColor: colors.border },
+            goalType === 'group' && { backgroundColor: colors.tint, borderColor: colors.tint },
+          ]}
+          onPress={() => setGoalType('group')}
+        >
+          <Ionicons name="people" size={16} color={goalType === 'group' ? '#fff' : colors.text} />
+          <Text style={[
+            styles.goalTypeText,
+            { color: goalType === 'group' ? '#fff' : colors.text },
+          ]}>Group Goal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.goalTypeChip,
+            { borderColor: colors.border },
+            goalType === 'individual' && { backgroundColor: colors.tint, borderColor: colors.tint },
+          ]}
+          onPress={() => setGoalType('individual')}
+        >
+          <Ionicons name="person" size={16} color={goalType === 'individual' ? '#fff' : colors.text} />
+          <Text style={[
+            styles.goalTypeText,
+            { color: goalType === 'individual' ? '#fff' : colors.text },
+          ]}>Individual Goals</Text>
+        </TouchableOpacity>
       </View>
+      <Text style={[styles.goalTypeHint, { color: colors.textSecondary }]}>
+        {goalType === 'group'
+          ? 'Everyone works toward the same shared goal'
+          : 'Each member sets their own personal goal'}
+      </Text>
+
+      {goalType === 'group' && (
+        <>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL GOAL ({exerciseType.toUpperCase()})</Text>
+          <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              style={[styles.input, { color: colors.text }]}
+              placeholder="e.g., 1000"
+              placeholderTextColor={colors.textSecondary}
+              value={groupGoal}
+              onChangeText={setGroupGoal}
+              keyboardType="number-pad"
+              testID="group-goal-input"
+            />
+          </View>
+        </>
+      )}
 
       <Text style={[styles.label, { color: colors.textSecondary }]}>CHALLENGE MONTH</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthRow}>
@@ -389,9 +522,14 @@ export default function GroupsScreen() {
         <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
           {format(currentMonth, 'MMM')} {startDay} - {format(currentMonth, 'MMM')} {endDay}, {currentMonth.getFullYear()} ({endDay - startDay + 1} days)
         </Text>
-        {parseInt(groupGoal) > 0 && (
+        {goalType === 'group' && parseInt(groupGoal) > 0 && (
           <Text style={[styles.summaryTarget, { color: colors.tint }]}>
-            ~{Math.ceil(parseInt(groupGoal) / (endDay - startDay + 1))} push-ups/day per member
+            ~{Math.ceil(parseInt(groupGoal) / (endDay - startDay + 1))} {getExerciseUnit(exerciseType)}/day per member
+          </Text>
+        )}
+        {goalType === 'individual' && (
+          <Text style={[styles.summaryTarget, { color: colors.tint }]}>
+            Members will set their own goals after joining
           </Text>
         )}
       </View>
@@ -488,6 +626,7 @@ export default function GroupsScreen() {
     const members = membersQuery.data || [];
     const totalDays = differenceInDays(parseISO(selectedGroup.endDate), parseISO(selectedGroup.startDate)) + 1;
     const isCreator = selectedGroup.createdBy === user?.id;
+    const isIndividualGoalType = selectedGroup.goalType === 'individual';
 
     return (
       <ScrollView
@@ -518,10 +657,55 @@ export default function GroupsScreen() {
 
         <View style={[styles.detailInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Goal</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>{selectedGroup.totalGoal.toLocaleString()} push-ups</Text>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Exercise</Text>
+            <View style={[styles.exerciseBadge, { backgroundColor: colors.tint + '15' }]}>
+              <Text style={[styles.exerciseBadgeText, { color: colors.tint }]}>{selectedGroup.exerciseType}</Text>
+            </View>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Goal Type</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>
+              {isIndividualGoalType ? 'Individual' : 'Group'}
+            </Text>
+          </View>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          {!isIndividualGoalType && (
+            <>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Goal</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>
+                  {selectedGroup.totalGoal.toLocaleString()} {getExerciseUnit(selectedGroup.exerciseType)}
+                </Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            </>
+          )}
+          {isIndividualGoalType && (
+            <>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Your Goal</Text>
+                {selectedGroup.myIndividualGoal ? (
+                  <TouchableOpacity onPress={() => {
+                    setIndividualGoalInput(selectedGroup.myIndividualGoal?.toString() || '');
+                    setShowSetGoal(true);
+                  }}>
+                    <Text style={[styles.detailValue, { color: colors.tint }]}>
+                      {selectedGroup.myIndividualGoal.toLocaleString()} {getExerciseUnit(selectedGroup.exerciseType)}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.setGoalMiniBtn, { backgroundColor: colors.tint + '15' }]}
+                    onPress={() => setShowSetGoal(true)}
+                  >
+                    <Text style={[styles.setGoalMiniBtnText, { color: colors.tint }]}>Set Goal</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            </>
+          )}
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Dates</Text>
             <Text style={[styles.detailValue, { color: colors.text }]}>
@@ -546,6 +730,42 @@ export default function GroupsScreen() {
             <Text style={[styles.detailValue, { color: colors.text }]}>{members.length}</Text>
           </View>
         </View>
+
+        {showSetGoal && isIndividualGoalType && (
+          <View style={[styles.setGoalCard, { backgroundColor: colors.card, borderColor: colors.tint + '40' }]}>
+            <Text style={[styles.setGoalTitle, { color: colors.text }]}>Set Your Goal</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder={`e.g., 500 ${getExerciseUnit(selectedGroup.exerciseType)}`}
+                placeholderTextColor={colors.textSecondary}
+                value={individualGoalInput}
+                onChangeText={setIndividualGoalInput}
+                keyboardType="number-pad"
+                testID="individual-goal-input"
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.border }}
+                onPress={() => setShowSetGoal(false)}
+              >
+                <Text style={{ color: colors.textSecondary, fontFamily: 'Inter_500Medium' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10, backgroundColor: colors.tint }}
+                onPress={handleSetIndividualGoal}
+                disabled={setIndividualGoalMutation.isPending}
+              >
+                {setIndividualGoalMutation.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold' }}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {activeGroupId === selectedGroup.id ? (
           <View style={[styles.activeGroupBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
@@ -586,7 +806,10 @@ export default function GroupsScreen() {
         ) : (
           leaderboard.map((entry) => {
             const isMe = entry.userId === user?.id;
-            const pct = selectedGroup.totalGoal > 0 ? Math.round((entry.totalCount / selectedGroup.totalGoal) * 100) : 0;
+            const effectiveGoal = entry.goalType === 'individual'
+              ? (entry.individualGoal || 0)
+              : entry.groupGoal;
+            const pct = effectiveGoal > 0 ? Math.round((entry.totalCount / effectiveGoal) * 100) : 0;
             return (
               <View
                 key={entry.userId}
@@ -612,7 +835,10 @@ export default function GroupsScreen() {
                 </View>
                 <View style={styles.leaderStats}>
                   <Text style={[styles.leaderCount, { color: colors.text }]}>{entry.totalCount.toLocaleString()}</Text>
-                  <Text style={[styles.leaderPct, { color: colors.textSecondary }]}>{pct}%</Text>
+                  <Text style={[styles.leaderUnit, { color: colors.textSecondary }]}>{getExerciseUnit(entry.exerciseType)}</Text>
+                  {effectiveGoal > 0 && (
+                    <Text style={[styles.leaderPct, { color: colors.textSecondary }]}>{pct}%</Text>
+                  )}
                 </View>
               </View>
             );
@@ -663,12 +889,24 @@ const styles = StyleSheet.create({
   groupName: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   groupMeta: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   groupCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1 },
-  groupDateRange: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  groupDateRange: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  exerciseBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  exerciseBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   codeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   codeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', letterSpacing: 1 },
   label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 8, letterSpacing: 0.5 },
   inputContainer: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, height: 52, justifyContent: 'center', marginBottom: 16 },
   input: { fontSize: 16, fontFamily: 'Inter_400Regular' },
+  pickerDropdown: { borderRadius: 14, borderWidth: 1, marginTop: -10, marginBottom: 16, overflow: 'hidden' },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  pickerItemText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  goalTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  goalTypeChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: 12, borderWidth: 1, gap: 6,
+  },
+  goalTypeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  goalTypeHint: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
   monthRow: { marginBottom: 16 },
   monthChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginRight: 8 },
   monthChipText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
@@ -680,7 +918,7 @@ const styles = StyleSheet.create({
   summaryTarget: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   errorText: { fontSize: 14, fontFamily: 'Inter_500Medium', textAlign: 'center', marginBottom: 8 },
   primaryButton: { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
-  primaryButtonGradient: { paddingVertical: 16, alignItems: 'center' },
+  primaryButtonGradient: { paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   primaryButtonText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   joinSection: { marginTop: 20 },
   joinHint: { fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
@@ -705,6 +943,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 3 },
   leaderStats: { alignItems: 'flex-end' },
   leaderCount: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  leaderUnit: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   leaderPct: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   leaveButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -718,4 +957,10 @@ const styles = StyleSheet.create({
     marginBottom: 8, gap: 8,
   },
   activeGroupText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', flex: 1 },
+  setGoalCard: {
+    borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16, gap: 12,
+  },
+  setGoalTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  setGoalMiniBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  setGoalMiniBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 });

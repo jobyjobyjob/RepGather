@@ -38,6 +38,41 @@ export default function TodayScreen() {
     logPushups(count);
   };
 
+  const exerciseLabel = activeGroup?.exerciseType?.toLowerCase() || 'push-ups';
+
+  const getEncouragementMessage = () => {
+    const todayDone = progress?.todayCount || 0;
+    const target = progress?.dynamicDailyTarget || 0;
+    const pctDone = progress?.percentComplete || 0;
+
+    if (todayDone >= target && target > 0) {
+      const successMessages = [
+        { text: "Let's Go!!!", emoji: "\uD83E\uDD1C\uD83E\uDD1B" },
+        { text: "Crushed it!", emoji: "\uD83D\uDD25" },
+        { text: "Beast mode!", emoji: "\uD83E\uDDB5" },
+        { text: "On fire today!", emoji: "\u26A1" },
+        { text: "Unstoppable!", emoji: "\uD83D\uDE80" },
+        { text: "Champion vibes!", emoji: "\uD83C\uDFC6" },
+      ];
+      return successMessages[Math.floor(Math.random() * successMessages.length)];
+    } else if (pctDone >= 75) {
+      const nearMessages = [
+        { text: "Almost there!", emoji: "\uD83C\uDFAF" },
+        { text: "So close!", emoji: "\uD83D\uDCAA" },
+        { text: "Keep pushing!", emoji: "\uD83D\uDE4C" },
+      ];
+      return nearMessages[Math.floor(Math.random() * nearMessages.length)];
+    } else {
+      const underMessages = [
+        { text: "You got this!", emoji: "\uD83D\uDCAA" },
+        { text: "Every rep counts!", emoji: "\u2B50" },
+        { text: "Stay strong!", emoji: "\uD83D\uDCAF" },
+        { text: "Keep going!", emoji: "\uD83C\uDF1F" },
+      ];
+      return underMessages[Math.floor(Math.random() * underMessages.length)];
+    }
+  };
+
   const handleFinishDay = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     finishScale.value = withSequence(
@@ -45,9 +80,10 @@ export default function TodayScreen() {
       withSpring(1, { damping: 10, stiffness: 400 })
     );
     setDayFinished(true);
+    const msg = getEncouragementMessage();
     Alert.alert(
-      'Great work!',
-      `You completed ${progress?.todayCount || 0} push-ups today. Keep up the momentum!`,
+      `${msg.text} ${msg.emoji}`,
+      `You logged ${progress?.todayCount || 0} ${exerciseLabel} today!`,
       [{ text: 'Awesome!', onPress: () => {} }]
     );
   };
@@ -71,7 +107,7 @@ export default function TodayScreen() {
             Start Your Challenge
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-            Set a push-up goal and track your progress towards becoming stronger every day.
+            Set a fitness goal and track your progress towards becoming stronger every day.
           </Text>
           <Pressable
             onPress={() => router.push('/setup')}
@@ -158,7 +194,7 @@ export default function TodayScreen() {
             </Text>
           </ProgressRing>
           <Text style={[styles.totalProgress, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            {progress?.totalCompleted.toLocaleString()} / {goal.totalGoal.toLocaleString()} push-ups
+            {progress?.totalCompleted.toLocaleString()} / {goal.totalGoal.toLocaleString()} {exerciseLabel}
           </Text>
         </View>
 

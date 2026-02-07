@@ -20,10 +20,13 @@ interface ProgressData {
 interface GroupInfo {
   id: string;
   name: string;
+  exerciseType: string;
+  goalType: string;
   totalGoal: number;
   startDate: string;
   endDate: string;
   inviteCode: string;
+  myIndividualGoal?: number | null;
 }
 
 interface PushupContextValue {
@@ -193,9 +196,13 @@ export function PushupProvider({ children }: { children: ReactNode }) {
 
   const effectiveGoal: PushupGoal | null = useMemo(() => {
     if (activeGroupId && activeGroup) {
+      let goalValue = activeGroup.totalGoal;
+      if (activeGroup.goalType === 'individual' && activeGroup.myIndividualGoal) {
+        goalValue = activeGroup.myIndividualGoal;
+      }
       return {
         id: activeGroup.id,
-        totalGoal: activeGroup.totalGoal,
+        totalGoal: goalValue,
         startDate: activeGroup.startDate,
         endDate: activeGroup.endDate,
         planType: 'average' as const,
