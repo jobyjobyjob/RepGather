@@ -1,31 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, useColorScheme, Platform, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { format, addMonths, startOfMonth, getDaysInMonth } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
 import { EXERCISE_TYPES } from '@shared/schema';
+import CalendarDateRangePicker from '@/components/CalendarDateRangePicker';
 
 const PRESET_GOALS = [1000, 2000, 5000, 10000];
-
-function generateMonthOptions() {
-  const options = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const date = addMonths(startOfMonth(now), i);
-    options.push({
-      label: format(date, 'MMMM yyyy'),
-      month: date.getMonth(),
-      year: date.getFullYear(),
-      daysInMonth: getDaysInMonth(date),
-    });
-  }
-  return options;
-}
 
 export default function SetupScreen() {
   const colorScheme = useColorScheme();
@@ -35,33 +21,18 @@ export default function SetupScreen() {
 
   const { createPersonalChallenge, setActiveChallenge } = usePushups();
 
-  const monthOptions = generateMonthOptions();
   const [challengeName, setChallengeName] = useState('');
   const [goalAmount, setGoalAmount] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
-  const [startDay, setStartDay] = useState(1);
-  const [endDay, setEndDay] = useState(monthOptions[0].daysInMonth);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [exerciseType, setExerciseType] = useState('Push-ups');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedMonth = monthOptions[selectedMonthIndex];
-  const daysArray = useMemo(() => {
-    return Array.from({ length: selectedMonth.daysInMonth }, (_, i) => i + 1);
-  }, [selectedMonth.daysInMonth]);
-
-  const startDateStr = `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-  const endDateStr = `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-
-  const totalDays = endDay - startDay + 1;
-
-  const handleSelectMonth = (index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedMonthIndex(index);
-    setStartDay(1);
-    setEndDay(monthOptions[index].daysInMonth);
-  };
+  const totalDays = startDate && endDate
+    ? differenceInCalendarDays(endDate, startDate) + 1
+    : 0;
 
   const handleSelectPreset = (amount: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -84,7 +55,7 @@ export default function SetupScreen() {
 
   const handleStartChallenge = async () => {
     const amount = parseInt(goalAmount, 10);
-    if (!amount || amount < 1 || totalDays < 1) {
+    if (!amount || amount < 1 || !startDate || !endDate || totalDays < 1) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -94,6 +65,8 @@ export default function SetupScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       const name = challengeName.trim() || `${exerciseType} Challenge`;
+      const startDateStr = format(startDate, 'yyyy-MM-dd');
+      const endDateStr = format(endDate, 'yyyy-MM-dd');
 
       const challenge = await createPersonalChallenge({
         name,
@@ -116,7 +89,7 @@ export default function SetupScreen() {
     ? Math.ceil(parseInt(goalAmount, 10) / totalDays)
     : 0;
 
-  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && totalDays >= 1 && !isSubmitting;
+  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && startDate && endDate && totalDays >= 1 && !isSubmitting;
 
   return (
     <KeyboardAvoidingView
@@ -240,136 +213,14 @@ export default function SetupScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            Select Month
+            Challenge Dates
           </Text>
-          <View style={styles.monthGrid}>
-            {monthOptions.slice(0, 6).map((option, i) => (
-              <Pressable
-                key={i}
-                onPress={() => handleSelectMonth(i)}
-                style={({ pressed }) => [
-                  styles.monthButton,
-                  {
-                    backgroundColor: selectedMonthIndex === i ? colors.tint : colors.card,
-                    borderColor: selectedMonthIndex === i ? colors.tint : colors.border,
-                  },
-                  pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
-                ]}
-              >
-                <Text style={[styles.monthText, { color: selectedMonthIndex === i ? '#FFFFFF' : colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                  {format(new Date(option.year, option.month), 'MMM')}
-                </Text>
-                <Text style={[styles.yearText, { color: selectedMonthIndex === i ? '#FFFFFF' : colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                  {option.year}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          {monthOptions.length > 6 && (
-            <View style={styles.monthGrid}>
-              {monthOptions.slice(6).map((option, idx) => {
-                const i = idx + 6;
-                return (
-                  <Pressable
-                    key={i}
-                    onPress={() => handleSelectMonth(i)}
-                    style={({ pressed }) => [
-                      styles.monthButton,
-                      {
-                        backgroundColor: selectedMonthIndex === i ? colors.tint : colors.card,
-                        borderColor: selectedMonthIndex === i ? colors.tint : colors.border,
-                      },
-                      pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
-                    ]}
-                  >
-                    <Text style={[styles.monthText, { color: selectedMonthIndex === i ? '#FFFFFF' : colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                      {format(new Date(option.year, option.month), 'MMM')}
-                    </Text>
-                    <Text style={[styles.yearText, { color: selectedMonthIndex === i ? '#FFFFFF' : colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                      {option.year}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            Start Date
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.dayRow}>
-              {daysArray.map((day) => {
-                const isSelected = day === startDay;
-                const isDisabled = day > endDay;
-                return (
-                  <Pressable
-                    key={day}
-                    onPress={() => {
-                      if (!isDisabled) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setStartDay(day);
-                      }
-                    }}
-                    style={[
-                      styles.dayButton,
-                      {
-                        backgroundColor: isSelected ? colors.tint : colors.card,
-                        borderColor: isSelected ? colors.tint : colors.border,
-                        opacity: isDisabled ? 0.3 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.dayButtonText, { color: isSelected ? '#FFFFFF' : colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                      {day}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            End Date
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.dayRow}>
-              {daysArray.map((day) => {
-                const isSelected = day === endDay;
-                const isDisabled = day < startDay;
-                return (
-                  <Pressable
-                    key={day}
-                    onPress={() => {
-                      if (!isDisabled) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setEndDay(day);
-                      }
-                    }}
-                    style={[
-                      styles.dayButton,
-                      {
-                        backgroundColor: isSelected ? colors.tint : colors.card,
-                        borderColor: isSelected ? colors.tint : colors.border,
-                        opacity: isDisabled ? 0.3 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.dayButtonText, { color: isSelected ? '#FFFFFF' : colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                      {day}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-          <Text style={[styles.dateHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-            {format(new Date(selectedMonth.year, selectedMonth.month, startDay), 'MMM d')} - {format(new Date(selectedMonth.year, selectedMonth.month, endDay), 'MMM d, yyyy')} ({totalDays} days)
-          </Text>
+          <CalendarDateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onSelectStart={(d) => { setStartDate(d); setEndDate(null); }}
+            onSelectEnd={setEndDate}
+          />
         </View>
 
         {isValid && (
@@ -424,14 +275,6 @@ const styles = StyleSheet.create({
   presetRow: { flexDirection: 'row', gap: 10 },
   presetButton: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   presetText: { fontSize: 15 },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  monthButton: { width: '31%', paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center', gap: 2 },
-  monthText: { fontSize: 15 },
-  yearText: { fontSize: 11 },
-  dayRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
-  dayButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dayButtonText: { fontSize: 15 },
-  dateHint: { fontSize: 13, textAlign: 'center', marginTop: 4 },
   pickerDropdown: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   pickerItemText: { fontSize: 15 },
