@@ -2,7 +2,7 @@
 
 ## Overview
 
-GritGather is a generic fitness tracking application built with Expo/React Native that supports multiple exercise types (push-ups, sit-ups, squats, running, etc.). Users can set fitness goals over defined time periods, create/join groups with invite codes, share progress, and compete on a leaderboard. Groups support both shared group goals and individual member goals. The app uses solo mode (local storage) and group mode (server-backed with PostgreSQL). It supports iOS, Android, and web platforms.
+GritGather is a generic fitness tracking application built with Expo/React Native that supports multiple exercise types (push-ups, sit-ups, squats, running, etc.). Users can set fitness goals over defined time periods, create/join groups with invite codes, share progress, and compete on a leaderboard. All challenges (personal and group) are stored server-side with PostgreSQL. Users can run multiple concurrent challenges and switch between them using challenge pickers. It supports iOS, Android, and web platforms.
 
 ## User Preferences
 
@@ -14,7 +14,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Expo SDK 54 with React Native 0.81, using the new architecture
 - **Routing**: expo-router with file-based routing in the `app/` directory
 - **State Management**: React Context (`PushupContext`, `AuthContext`) for app-wide state, TanStack React Query for server state
-- **Data Persistence**: AsyncStorage for local/solo data; PostgreSQL for group data
+- **Data Persistence**: All data server-backed via PostgreSQL; AsyncStorage only for active challenge ID selection
 - **Animations**: react-native-reanimated for smooth animations (progress rings, button interactions)
 - **Haptic Feedback**: expo-haptics for tactile feedback on user interactions
 
@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Navigation Structure
 - Tab-based navigation with four main screens: Today (index), History, Groups, Settings
-- Modal screens for Setup (goal creation) and Edit Log functionality
+- Modal screens for Setup (personal challenge creation) and Edit Log functionality
 - Uses expo-router's typed routes for type-safe navigation
 
 ### Component Architecture
@@ -38,32 +38,32 @@ Preferred communication style: Simple, everyday language.
 - Express.js server running on Node.js (port 5000)
 - Session-based authentication with PostgreSQL session store
 - Drizzle ORM for database operations
-- Routes: auth, groups, daily logs
+- Routes: auth, challenges, groups, daily logs
 
 ### Data Models
-- **Users**: id, username, displayName, passwordHash
-- **Groups**: id, name, inviteCode (6-char), totalGoal, startDate, endDate, createdBy
-- **GroupMembers**: id, groupId, userId, joinedAt
+- **Users**: id, username, displayName, password
+- **Groups**: id, name, inviteCode (6-char), exerciseType, goalType, totalGoal, individualGoal, startDate, endDate, isPersonal, createdBy
+- **GroupMembers**: id, groupId, userId, individualGoal, joinedAt
 - **DailyLogs**: id, userId, groupId, date, count (unique per user+group+date)
-- **PushupGoal** (local): Target count, start/end dates, planType
-- **ReminderSettings** (local): Notification preferences with time slots
 
-### Group System
-- Users create groups with a name, push-up goal, and date range
-- 6-character invite codes generated server-side for joining
-- "Active group" concept: selecting a group makes the Today tab track that group's data
-- Leaderboard shows member rankings with progress bars
+### Challenge System (Unified)
+- Personal challenges and group challenges are both stored as `groups` in the database
+- Personal challenges have `isPersonal: true` flag; cannot be joined via invite code
+- Group challenges have `isPersonal: false` and can be joined with invite codes
+- Users can have multiple concurrent challenges (e.g., push-ups AND sit-ups)
+- Challenge picker (horizontal scrolling chips) shown in Today and History tabs
+- Only one challenge can be "active" at a time for tracking
+- Active challenge ID stored in AsyncStorage for persistence
+
+### Groups Tab
+- Shows only non-personal (collaborative) groups
+- Create group, join group via invite code, view leaderboard
 - Group creator cannot leave; other members can leave
-
-### Dual Data Mode (PushupContext)
-- **Solo mode** (no active group): Uses AsyncStorage locally for goals and logs
-- **Group mode** (active group set): Fetches goal from group data, logs from server API
-- Active group ID stored in AsyncStorage (persists across sessions)
-- Switching between modes is seamless via group selection in Groups tab
 
 ### API Endpoints
 - Auth: register, login, logout, me
-- Groups: POST /api/groups, POST /api/groups/join, GET /api/groups, GET /api/groups/:id/members, GET /api/groups/:id/leaderboard, DELETE /api/groups/:id/leave
+- Challenges: GET /api/challenges (all user challenges), POST /api/challenges/personal, DELETE /api/challenges/:id
+- Groups: POST /api/groups, POST /api/groups/join, GET /api/groups, GET /api/groups/:id/members, GET /api/groups/:id/leaderboard, PUT /api/groups/:id/individual-goal, DELETE /api/groups/:id/leave
 - Logs: POST /api/logs, PUT /api/logs, GET /api/logs/:groupId, DELETE /api/logs/:groupId/:date
 
 ### Build System
@@ -74,29 +74,30 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Database
-- PostgreSQL via Drizzle ORM (active, used for auth, groups, and group logs)
+- PostgreSQL via Drizzle ORM (active, used for auth, challenges, groups, and logs)
 - Schema defined in `shared/schema.ts`
 
 ### Third-Party Services
 - **Expo Notifications**: Push notification support for reminders
-- **AsyncStorage**: Local data persistence for solo mode and settings
+- **AsyncStorage**: Only for storing active challenge ID selection
 
 ### Key Libraries
 - **UI**: expo-blur, expo-linear-gradient, react-native-svg, @expo/vector-icons
 - **Fonts**: Inter font family via @expo-google-fonts/inter
 - **Date Handling**: date-fns for date manipulation and formatting
 - **Validation**: Zod with drizzle-zod for schema validation
-- **Auth**: express-session, connect-pg-simple, bcrypt
+- **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-02-07: Restructured to fully server-backed multi-challenge system (removed local storage solo mode)
+- 2026-02-07: Added challenge picker (horizontal chips) to Today and History tabs
+- 2026-02-07: Personal challenges created via POST /api/challenges/personal
+- 2026-02-07: Groups tab now filters to show only collaborative (non-personal) groups
+- 2026-02-07: Settings tab shows active challenge info and personal challenge management
+- 2026-02-07: PushupContext rewritten to support multiple concurrent server-backed challenges
 - 2026-02-07: Renamed app from PushUp Pro to GritGather
 - 2026-02-07: Added exercise type selection (12 types: push-ups, sit-ups, squats, running, etc.)
 - 2026-02-07: Implemented individual vs group goal system with toggle in group creation
 - 2026-02-07: Enhanced leaderboard with exercise-specific unit labels and percentage display
-- 2026-02-07: Added contextual encouragement messages with emojis when logging activity
-- 2026-02-07: Updated schema with exerciseType, goalType, individualGoal fields
-- 2026-02-07: Dynamic exercise labels in Today tab based on active group exercise type
 - 2026-02-07: Added user authentication (register/login/logout)
 - 2026-02-07: Added Groups tab with create, join, leaderboard functionality
-- 2026-02-07: Connected Today tab to server data for group mode tracking
-- 2026-02-07: Added account section and sign out to Settings
