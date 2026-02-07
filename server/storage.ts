@@ -35,6 +35,8 @@ export async function createUser(data: InsertUser): Promise<User> {
 
 export async function createGroup(data: {
   name: string;
+  exerciseType?: string;
+  goalType?: string;
   totalGoal: number;
   startDate: string;
   endDate: string;
@@ -42,7 +44,13 @@ export async function createGroup(data: {
 }): Promise<Group> {
   const inviteCode = generateInviteCode();
   const [group] = await db.insert(groups).values({
-    ...data,
+    name: data.name,
+    exerciseType: data.exerciseType || "Push-ups",
+    goalType: data.goalType || "group",
+    totalGoal: data.totalGoal,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    createdBy: data.createdBy,
     inviteCode,
   }).returning();
 
@@ -76,12 +84,16 @@ export async function getGroupsForUser(userId: string) {
     .select({
       group: groups,
       joinedAt: groupMembers.joinedAt,
+      individualGoal: groupMembers.individualGoal,
     })
     .from(groupMembers)
     .innerJoin(groups, eq(groupMembers.groupId, groups.id))
     .where(eq(groupMembers.userId, userId));
 
-  return memberships.map(m => m.group);
+  return memberships.map(m => ({
+    ...m.group,
+    myIndividualGoal: m.individualGoal,
+  }));
 }
 
 export async function getGroupMembers(groupId: string) {
@@ -91,12 +103,28 @@ export async function getGroupMembers(groupId: string) {
       username: users.username,
       displayName: users.displayName,
       joinedAt: groupMembers.joinedAt,
+      individualGoal: groupMembers.individualGoal,
     })
     .from(groupMembers)
     .innerJoin(users, eq(groupMembers.userId, users.id))
     .where(eq(groupMembers.groupId, groupId));
 
   return members;
+}
+
+export async function setIndividualGoal(groupId: string, userId: string, goal: number): Promise<void> {
+  await db
+    .update(groupMembers)
+    .set({ individualGoal: goal })
+    .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+}
+
+export async function getIndividualGoal(groupId: string, userId: string): Promise<number | null> {
+  const [member] = await db
+    .select({ individualGoal: groupMembers.individualGoal })
+    .from(groupMembers)
+    .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+  return member?.individualGoal ?? null;
 }
 
 export async function logPushups(data: {
@@ -158,10 +186,13 @@ export async function deleteLogForDate(userId: string, groupId: string, date: st
 }
 
 export async function getLeaderboard(groupId: string) {
+  const group = await getGroup(groupId);
+
   const results = await db
     .select({
-      userId: dailyLogs.userId,
+      userId: groupMembers.userId,
       displayName: users.displayName,
+      individualGoal: groupMembers.individualGoal,
       totalCount: sql<number>`COALESCE(SUM(${dailyLogs.count}), 0)::int`.as("total_count"),
     })
     .from(groupMembers)
@@ -174,7 +205,7 @@ export async function getLeaderboard(groupId: string) {
       ),
     )
     .where(eq(groupMembers.groupId, groupId))
-    .groupBy(dailyLogs.userId, users.displayName, groupMembers.userId)
+    .groupBy(groupMembers.userId, users.displayName, groupMembers.individualGoal)
     .orderBy(desc(sql`total_count`));
 
   return results.map((r, i) => ({
@@ -182,6 +213,10 @@ export async function getLeaderboard(groupId: string) {
     userId: r.userId,
     displayName: r.displayName || "Unknown",
     totalCount: r.totalCount || 0,
+    individualGoal: r.individualGoal,
+    groupGoal: group?.totalGoal || 0,
+    exerciseType: group?.exerciseType || "Push-ups",
+    goalType: group?.goalType || "group",
   }));
 }
 

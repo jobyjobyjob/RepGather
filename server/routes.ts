@@ -108,12 +108,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Group routes
   app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { name, totalGoal, startDate, endDate } = req.body;
+      const { name, exerciseType, goalType, totalGoal, startDate, endDate } = req.body;
       if (!name || !totalGoal || !startDate || !endDate) {
         return res.status(400).json({ message: "All fields are required" });
       }
       const group = await storage.createGroup({
         name,
+        exerciseType: exerciseType || "Push-ups",
+        goalType: goalType || "group",
         totalGoal,
         startDate,
         endDate,
@@ -180,6 +182,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leaderboard);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get leaderboard" });
+    }
+  });
+
+  app.put("/api/groups/:id/individual-goal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { goal } = req.body;
+      if (!goal || goal < 1) {
+        return res.status(400).json({ message: "Goal must be a positive number" });
+      }
+      await storage.setIndividualGoal(req.params.id as string, req.session.userId!, goal);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Set individual goal error:", error);
+      res.status(500).json({ message: "Failed to set individual goal" });
     }
   });
 
