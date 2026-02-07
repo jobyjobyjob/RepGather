@@ -136,13 +136,15 @@ export default function TodayScreen() {
       withSpring(1.1, { damping: 10, stiffness: 400 }),
       withSpring(1, { damping: 10, stiffness: 400 })
     );
-    setDayFinished(true);
-    const msg = getEncouragementMessage();
-    Alert.alert(
-      `${msg.text} ${msg.emoji}`,
-      `You logged ${progress?.todayCount || 0} ${exerciseLabel} today!`,
-      [{ text: 'Awesome!', onPress: () => {} }]
-    );
+    if (!dayFinished) {
+      setDayFinished(true);
+      const msg = getEncouragementMessage();
+      Alert.alert(
+        `${msg.text} ${msg.emoji}`,
+        `You logged ${progress?.todayCount || 0} ${exerciseLabel} today!`,
+        [{ text: 'Awesome!', onPress: () => {} }]
+      );
+    }
   };
 
   const handleChallengeSelect = (id: string) => {
@@ -339,8 +341,8 @@ export default function TodayScreen() {
               style={({ pressed }) => [
                 styles.finishButton,
                 {
-                  backgroundColor: dayFinished ? colors.success : colors.card,
-                  borderColor: dayFinished ? colors.success : colors.success,
+                  backgroundColor: dayFinished ? colors.success + '15' : colors.card,
+                  borderColor: dayFinished ? colors.success : colors.border,
                 },
                 pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
               ]}
@@ -348,16 +350,16 @@ export default function TodayScreen() {
               <Ionicons
                 name={dayFinished ? "checkmark-circle" : "checkmark-circle-outline"}
                 size={24}
-                color={dayFinished ? '#FFFFFF' : colors.success}
+                color={dayFinished ? colors.success : colors.textSecondary}
               />
               <Text style={[
                 styles.finishButtonText,
                 {
-                  color: dayFinished ? '#FFFFFF' : colors.success,
+                  color: dayFinished ? colors.success : colors.textSecondary,
                   fontFamily: 'Inter_600SemiBold',
                 }
               ]}>
-                {dayFinished ? 'Day Complete!' : 'Finish Day'}
+                {dayFinished ? 'Day Complete' : 'Finish Day'}
               </Text>
             </Pressable>
           </Animated.View>

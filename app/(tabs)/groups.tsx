@@ -201,6 +201,29 @@ export default function GroupsScreen() {
     ]);
   };
 
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: string) => {
+      await apiRequest("DELETE", `/api/challenges/${groupId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+      setViewMode('list');
+      setSelectedGroup(null);
+    },
+  });
+
+  const handleDeleteGroup = (group: GroupData) => {
+    Alert.alert(
+      'Delete Group',
+      `Are you sure you want to delete "${group.name}"? This will remove the group and all its data for all members. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteGroupMutation.mutate(group.id) },
+      ]
+    );
+  };
+
   const handleSetIndividualGoal = () => {
     const goal = parseInt(individualGoalInput);
     if (!goal || goal < 1 || !selectedGroup) return;
@@ -709,22 +732,28 @@ export default function GroupsScreen() {
           </View>
         )}
 
-        {activeChallengeId === selectedGroup.id ? (
-          <View style={[styles.activeGroupBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-            <Text style={[styles.activeGroupText, { color: colors.success }]}>
-              Tracking on Today tab
-            </Text>
-            <TouchableOpacity onPress={() => setActiveGroupCtx(null)} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.success} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.trackButton}
-            onPress={() => setActiveGroupCtx(selectedGroup.id)}
-            testID="track-group-btn"
-          >
+        <TouchableOpacity
+          style={[
+            styles.trackButton,
+            activeChallengeId === selectedGroup.id && { opacity: 1 },
+          ]}
+          onPress={() => {
+            if (activeChallengeId === selectedGroup.id) {
+              setActiveGroupCtx(null);
+            } else {
+              setActiveGroupCtx(selectedGroup.id);
+            }
+          }}
+          testID="track-group-btn"
+        >
+          {activeChallengeId === selectedGroup.id ? (
+            <View style={[styles.primaryButtonGradient, {
+              backgroundColor: colors.border,
+            }]}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              <Text style={[styles.primaryButtonText, { color: colors.textSecondary }]}>Remove from Home</Text>
+            </View>
+          ) : (
             <LinearGradient
               colors={['#FF6B35', '#FF9F1C']}
               style={styles.primaryButtonGradient}
@@ -734,8 +763,8 @@ export default function GroupsScreen() {
               <Ionicons name="flame" size={20} color="#fff" />
               <Text style={styles.primaryButtonText}>Track in Home</Text>
             </LinearGradient>
-          </TouchableOpacity>
-        )}
+          )}
+        </TouchableOpacity>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Leaderboard</Text>
 
@@ -787,16 +816,27 @@ export default function GroupsScreen() {
           })
         )}
 
-        {!isCreator && (
-          <TouchableOpacity
-            style={[styles.leaveButton, { borderColor: colors.error }]}
-            onPress={() => handleLeaveGroup(selectedGroup)}
-            testID="leave-group-btn"
-          >
-            <Ionicons name="exit-outline" size={18} color={colors.error} />
-            <Text style={[styles.leaveButtonText, { color: colors.error }]}>Leave Group</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.actionButtonsContainer}>
+          {isCreator ? (
+            <TouchableOpacity
+              style={[styles.destructiveButton, { borderColor: colors.error }]}
+              onPress={() => handleDeleteGroup(selectedGroup)}
+              testID="delete-group-btn"
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+              <Text style={[styles.destructiveButtonText, { color: colors.error }]}>Delete Group</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.destructiveButton, { borderColor: colors.error }]}
+              onPress={() => handleLeaveGroup(selectedGroup)}
+              testID="leave-group-btn"
+            >
+              <Ionicons name="exit-outline" size={18} color={colors.error} />
+              <Text style={[styles.destructiveButtonText, { color: colors.error }]}>Leave Group</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
     );
   };
@@ -881,11 +921,12 @@ const styles = StyleSheet.create({
   leaderCount: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   leaderUnit: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   leaderPct: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  leaveButton: {
+  actionButtonsContainer: { marginTop: 24, gap: 12 },
+  destructiveButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginTop: 20, gap: 8,
+    paddingVertical: 14, borderRadius: 14, borderWidth: 1, gap: 8,
   },
-  leaveButtonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  destructiveButtonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   trackButton: { borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
   activeGroupBadge: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
