@@ -10,6 +10,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePushups } from '@/contexts/PushupContext';
 import { apiRequest, queryClient } from '@/lib/query-client';
 
 type ViewMode = 'list' | 'create' | 'join' | 'detail';
@@ -43,6 +44,7 @@ export default function GroupsScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { activeGroupId, setActiveGroup: setActiveGroupCtx } = usePushups();
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null);
@@ -221,19 +223,26 @@ export default function GroupsScreen() {
         ) : (
           groups.map((group) => {
             const totalDays = differenceInDays(parseISO(group.endDate), parseISO(group.startDate)) + 1;
+            const isActive = activeGroupId === group.id;
             return (
               <TouchableOpacity
                 key={group.id}
-                style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.groupCard, {
+                  backgroundColor: colors.card,
+                  borderColor: isActive ? colors.tint : colors.border,
+                  borderWidth: isActive ? 2 : 1,
+                }]}
                 onPress={() => openGroup(group)}
                 testID={`group-card-${group.id}`}
               >
                 <View style={styles.groupCardHeader}>
-                  <View style={[styles.groupIcon, { backgroundColor: colors.tint + '20' }]}>
-                    <Ionicons name="people" size={24} color={colors.tint} />
+                  <View style={[styles.groupIcon, { backgroundColor: isActive ? colors.tint + '30' : colors.tint + '20' }]}>
+                    <Ionicons name={isActive ? "flame" : "people"} size={24} color={colors.tint} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.groupName, { color: colors.text }]}>{group.name}</Text>
+                    <Text style={[styles.groupName, { color: colors.text }]}>
+                      {group.name}{isActive ? ' (Active)' : ''}
+                    </Text>
                     <Text style={[styles.groupMeta, { color: colors.textSecondary }]}>
                       {group.totalGoal.toLocaleString()} push-ups in {totalDays} days
                     </Text>
@@ -538,6 +547,34 @@ export default function GroupsScreen() {
           </View>
         </View>
 
+        {activeGroupId === selectedGroup.id ? (
+          <View style={[styles.activeGroupBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={[styles.activeGroupText, { color: colors.success }]}>
+              Tracking on Today tab
+            </Text>
+            <TouchableOpacity onPress={() => setActiveGroupCtx(null)} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.success} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.trackButton}
+            onPress={() => setActiveGroupCtx(selectedGroup.id)}
+            testID="track-group-btn"
+          >
+            <LinearGradient
+              colors={['#FF6B35', '#FF9F1C']}
+              style={styles.primaryButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Ionicons name="flame" size={20} color="#fff" />
+              <Text style={styles.primaryButtonText}>Track in Today Tab</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Leaderboard</Text>
 
         {leaderboardQuery.isLoading ? (
@@ -674,4 +711,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginTop: 20, gap: 8,
   },
   leaveButtonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  trackButton: { borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
+  activeGroupBadge: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1,
+    marginBottom: 8, gap: 8,
+  },
+  activeGroupText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', flex: 1 },
 });

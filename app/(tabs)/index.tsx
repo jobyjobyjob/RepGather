@@ -8,6 +8,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } 
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CounterButton } from '@/components/CounterButton';
 import { StatCard } from '@/components/StatCard';
@@ -20,7 +21,8 @@ export default function TodayScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, goal, logs, progress, logPushups } = usePushups();
+  const { isLoading, goal, logs, progress, logPushups, activeGroupId, activeGroup, setActiveGroup } = usePushups();
+  const { user } = useAuth();
   const [dayFinished, setDayFinished] = useState(false);
 
   const finishScale = useSharedValue(1);
@@ -117,11 +119,27 @@ export default function TodayScreen() {
       >
         <View style={styles.header}>
           <Text style={[styles.greeting, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            {getGreeting()}
+            {getGreeting()}{user ? `, ${user.displayName}` : ''}
           </Text>
           <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
             {todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
           </Text>
+          {activeGroup && (
+            <View style={styles.groupBanner}>
+              <View style={[styles.groupBannerContent, { backgroundColor: colors.tint + '15' }]}>
+                <Ionicons name="people" size={16} color={colors.tint} />
+                <Text style={[styles.groupBannerText, { color: colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
+                  {activeGroup.name}
+                </Text>
+                <Pressable
+                  onPress={() => setActiveGroup(null)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close-circle" size={18} color={colors.tint} />
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.progressSection}>
@@ -297,6 +315,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
+  },
+  groupBanner: {
+    marginTop: 8,
+  },
+  groupBannerContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignSelf: 'flex-start' as const,
+  },
+  groupBannerText: {
+    fontSize: 14,
   },
   progressSection: {
     alignItems: 'center',
