@@ -12,7 +12,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CounterButton } from '@/components/CounterButton';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
-import { MonthCalendar } from '@/components/MonthCalendar';
 
 function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   challenges: Challenge[];
@@ -323,6 +322,7 @@ export default function TodayScreen() {
           onIncrement={handleIncrement}
           tintColor={colors.tint}
           textColor={colors.text}
+          exerciseLabel={exerciseLabel}
         />
 
         <QuickAddButtons
@@ -384,18 +384,6 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        <MonthCalendar
-          goal={{
-            id: activeChallenge.id,
-            totalGoal: goalValue,
-            startDate: activeChallenge.startDate,
-            endDate: activeChallenge.endDate,
-            planType: 'average' as const,
-            createdAt: '',
-          }}
-          logs={logs.map(l => ({ ...l, createdAt: '' }))}
-          colors={colors}
-        />
       </ScrollView>
     </View>
   );

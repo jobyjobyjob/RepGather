@@ -13,7 +13,7 @@ function NativeTabLayout() {
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "flame", selected: "flame.fill" }} />
-        <Label>Today</Label>
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
@@ -67,7 +67,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Today",
+          title: "Home",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "flame" : "flame-outline"} size={24} color={color} />
           ),

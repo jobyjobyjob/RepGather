@@ -15,11 +15,12 @@ interface CounterButtonProps {
   onIncrement: () => void;
   tintColor: string;
   textColor: string;
+  exerciseLabel?: string;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function CounterButton({ count, onIncrement, tintColor, textColor }: CounterButtonProps) {
+export function CounterButton({ count, onIncrement, tintColor, textColor, exerciseLabel = 'push-up' }: CounterButtonProps) {
   const scale = useSharedValue(1);
   const counterScale = useSharedValue(1);
 
@@ -56,7 +57,7 @@ export function CounterButton({ count, onIncrement, tintColor, textColor }: Coun
       >
         <Ionicons name="add" size={48} color="#FFFFFF" />
       </AnimatedPressable>
-      <Text style={[styles.hintText, { color: textColor, opacity: 0.5 }]}>Tap to add 1 push-up</Text>
+      <Text style={[styles.hintText, { color: textColor, opacity: 0.5 }]}>Tap to add 1 {exerciseLabel}</Text>
     </View>
   );
 }

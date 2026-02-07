@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList,
   ActivityIndicator, useColorScheme, Platform, Alert, ScrollView, RefreshControl,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -305,9 +306,17 @@ export default function GroupsScreen() {
                       <Text style={[styles.exerciseBadgeText, { color: colors.tint }]}>{group.exerciseType}</Text>
                     </View>
                   </View>
-                  <View style={[styles.codeBadge, { backgroundColor: colors.tint + '15' }]}>
+                  <TouchableOpacity
+                    style={[styles.codeBadge, { backgroundColor: colors.tint + '15', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Clipboard.setStringAsync(group.inviteCode);
+                      Alert.alert('Copied', 'Invite code copied to clipboard');
+                    }}
+                  >
                     <Text style={[styles.codeText, { color: colors.tint }]}>{group.inviteCode}</Text>
-                  </View>
+                    <Ionicons name="copy-outline" size={14} color={colors.tint} />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
@@ -646,9 +655,16 @@ export default function GroupsScreen() {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Invite Code</Text>
-            <View style={[styles.codeBadgeLarge, { backgroundColor: colors.tint + '15' }]}>
+            <TouchableOpacity
+              style={[styles.codeBadgeLarge, { backgroundColor: colors.tint + '15', flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+              onPress={() => {
+                Clipboard.setStringAsync(selectedGroup.inviteCode);
+                Alert.alert('Copied', 'Invite code copied to clipboard');
+              }}
+            >
               <Text style={[styles.codeLargeText, { color: colors.tint }]}>{selectedGroup.inviteCode}</Text>
-            </View>
+              <Ionicons name="copy-outline" size={16} color={colors.tint} />
+            </TouchableOpacity>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.detailRow}>
@@ -716,7 +732,7 @@ export default function GroupsScreen() {
               end={{ x: 1, y: 0 }}
             >
               <Ionicons name="flame" size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>Track in Today Tab</Text>
+              <Text style={styles.primaryButtonText}>Track in Home</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}

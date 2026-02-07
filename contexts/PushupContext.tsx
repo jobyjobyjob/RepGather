@@ -183,13 +183,14 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     if (challengeId) {
       await AsyncStorage.setItem(ACTIVE_CHALLENGE_KEY, challengeId);
       setActiveChallengeIdState(challengeId);
+      await fetchChallenges();
       await fetchLogs(challengeId);
     } else {
       await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
       setActiveChallengeIdState(null);
       setLogs([]);
     }
-  }, [fetchLogs]);
+  }, [fetchChallenges, fetchLogs]);
 
   const logActivity = useCallback(async (count: number) => {
     if (!activeChallengeId) return;
