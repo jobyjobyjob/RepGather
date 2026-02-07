@@ -25,12 +25,12 @@ Preferred communication style: Simple, everyday language.
 - Endpoints: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/me
 
 ### Navigation Structure
-- Tab-based navigation with four main screens: Today (index), History, Groups, Settings
+- Tab-based navigation with five main screens: Home (index), History, Leaderboard, Groups, Settings
 - Modal screens for Setup (personal challenge creation) and Edit Log functionality
 - Uses expo-router's typed routes for type-safe navigation
 
 ### Component Architecture
-- Reusable UI components: `ProgressRing`, `CounterButton`, `StatCard`, `QuickAddButtons`, `MonthCalendar`
+- Reusable UI components: `ProgressRing`, `CounterButton`, `StatCard`, `QuickAddButtons`, `CalendarDateRangePicker`
 - Error boundary implementation for graceful error handling
 - Platform-aware components that adapt to iOS, Android, and web
 
@@ -89,6 +89,11 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-02-07: Added dedicated Leaderboard tab with challenge picker for viewing progress across all challenges
+- 2026-02-07: "Track in Home" button now toggles: dull "Remove from Home" when active, gradient when inactive
+- 2026-02-07: "Finish Day" button shows selected state visually; subsequent taps update the day
+- 2026-02-07: Added "Delete Group" with confirmation for group creators
+- 2026-02-07: "Leave Group" option for non-creator members in group detail
 - 2026-02-07: Restructured to fully server-backed multi-challenge system (removed local storage solo mode)
 - 2026-02-07: Added challenge picker (horizontal chips) to Today and History tabs
 - 2026-02-07: Personal challenges created via POST /api/challenges/personal
