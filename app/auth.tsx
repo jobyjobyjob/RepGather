@@ -73,7 +73,7 @@ export default function AuthScreen() {
             >
               <Ionicons name="fitness" size={48} color="#fff" />
             </LinearGradient>
-            <Text style={[styles.title, { color: colors.text }]}>GritGather</Text>
+            <Text style={[styles.title, { color: colors.text }]}>RepGather</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {isLogin ? 'Welcome back' : 'Create your account'}
             </Text>

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, queryClient } from '@/lib/query-client';
 import { differenceInDays, parseISO, startOfDay, format } from 'date-fns';
 
-const ACTIVE_CHALLENGE_KEY = 'gritgather_active_challenge';
+const ACTIVE_CHALLENGE_KEY = 'repgather_active_challenge';
 
 function getTodayDateString(): string {
   return new Date().toISOString().split('T')[0];

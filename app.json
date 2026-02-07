@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "GritGather",
-    "slug": "gritgather",
+    "name": "RepGather",
+    "slug": "repgather",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "gritgather",
+    "scheme": "repgather",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

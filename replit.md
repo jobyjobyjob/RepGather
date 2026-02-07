@@ -1,8 +1,8 @@
-# GritGather
+# RepGather
 
 ## Overview
 
-GritGather is a generic fitness tracking application built with Expo/React Native that supports multiple exercise types (push-ups, sit-ups, squats, running, etc.). Users can set fitness goals over defined time periods, create/join groups with invite codes, share progress, and compete on a leaderboard. All challenges (personal and group) are stored server-side with PostgreSQL. Users can run multiple concurrent challenges and switch between them using challenge pickers. It supports iOS, Android, and web platforms.
+RepGather is a generic fitness tracking application built with Expo/React Native that supports multiple exercise types (push-ups, sit-ups, squats, running, etc.). Users can set fitness goals over defined time periods, create/join groups with invite codes, share progress, and compete on a leaderboard. All challenges (personal and group) are stored server-side with PostgreSQL. Users can run multiple concurrent challenges and switch between them using challenge pickers. It supports iOS, Android, and web platforms.
 
 ## User Preferences
 
@@ -100,7 +100,7 @@ Preferred communication style: Simple, everyday language.
 - 2026-02-07: Groups tab now filters to show only collaborative (non-personal) groups
 - 2026-02-07: Settings tab shows active challenge info and personal challenge management
 - 2026-02-07: PushupContext rewritten to support multiple concurrent server-backed challenges
-- 2026-02-07: Renamed app from PushUp Pro to GritGather
+- 2026-02-07: Renamed app from GritGather to RepGather
 - 2026-02-07: Added exercise type selection (12 types: push-ups, sit-ups, squats, running, etc.)
 - 2026-02-07: Implemented individual vs group goal system with toggle in group creation
 - 2026-02-07: Enhanced leaderboard with exercise-specific unit labels and percentage display

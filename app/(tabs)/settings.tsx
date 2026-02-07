@@ -250,7 +250,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-            GritGather v1.0.0
+            RepGather v1.0.0
           </Text>
         </View>
       </ScrollView>
