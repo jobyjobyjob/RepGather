@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, date, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, date, timestamp, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -19,6 +19,8 @@ export const groups = pgTable("groups", {
     .default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
+  exerciseType: text("exercise_type").notNull().default("Push-ups"),
+  goalType: text("goal_type").notNull().default("group"),
   totalGoal: integer("total_goal").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
@@ -32,6 +34,7 @@ export const groupMembers = pgTable("group_members", {
     .default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),
   userId: varchar("user_id").notNull().references(() => users.id),
+  individualGoal: integer("individual_goal"),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("group_user_unique").on(table.groupId, table.userId),
@@ -58,6 +61,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const insertGroupSchema = createInsertSchema(groups).pick({
   name: true,
+  exerciseType: true,
+  goalType: true,
   totalGoal: true,
   startDate: true,
   endDate: true,
@@ -74,3 +79,18 @@ export type User = typeof users.$inferSelect;
 export type Group = typeof groups.$inferSelect;
 export type GroupMember = typeof groupMembers.$inferSelect;
 export type DailyLog = typeof dailyLogs.$inferSelect;
+
+export const EXERCISE_TYPES = [
+  "Push-ups",
+  "Sit-ups",
+  "Squats",
+  "Pull-ups",
+  "Burpees",
+  "Lunges",
+  "Planks (seconds)",
+  "Running (miles)",
+  "Cycling (miles)",
+  "Jump Rope",
+  "Jumping Jacks",
+  "Other",
+] as const;
