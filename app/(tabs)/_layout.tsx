@@ -19,6 +19,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>History</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="groups">
+        <Icon sf={{ default: "person.3", selected: "person.3.fill" }} />
+        <Label>Groups</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
         <Label>Settings</Label>
@@ -75,6 +79,15 @@ function ClassicTabLayout() {
           title: "History",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="groups"
+        options={{
+          title: "Groups",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "people" : "people-outline"} size={24} color={color} />
           ),
         }}
       />

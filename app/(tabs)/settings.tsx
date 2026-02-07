@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 
 import Colors from '@/constants/colors';
 import { usePushups } from '@/contexts/PushupContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -26,6 +27,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
 
   const { isLoading, goal, reminderSettings, updateReminders, resetChallenge, progress } = usePushups();
+  const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(reminderSettings.enabled);
 
   useEffect(() => {
@@ -257,6 +259,51 @@ export default function SettingsScreen() {
             </Pressable>
           )}
         </View>
+
+        {user && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
+              ACCOUNT
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={styles.goalInfo}>
+                <View style={[styles.goalIcon, { backgroundColor: colors.tint + '20' }]}>
+                  <Ionicons name="person" size={24} color={colors.tint} />
+                </View>
+                <View style={styles.goalDetails}>
+                  <Text style={[styles.goalValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                    {user.displayName}
+                  </Text>
+                  <Text style={[styles.goalDate, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                    @{user.username}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => {
+                Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign Out', style: 'destructive', onPress: logout },
+                ]);
+              }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                { backgroundColor: colors.card },
+                pressed && { opacity: 0.8 },
+              ]}
+              testID="logout-btn"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: colors.error + '20' }]}>
+                <Ionicons name="log-out" size={22} color={colors.error} />
+              </View>
+              <Text style={[styles.actionLabel, { color: colors.error, fontFamily: 'Inter_600SemiBold' }]}>
+                Sign Out
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>

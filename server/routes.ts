@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/groups/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const group = await storage.getGroup(req.params.id);
+      const group = await storage.getGroup(req.params.id as string);
       if (!group) {
         return res.status(404).json({ message: "Group not found" });
       }
@@ -167,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/groups/:id/members", requireAuth, async (req: Request, res: Response) => {
     try {
-      const members = await storage.getGroupMembers(req.params.id);
+      const members = await storage.getGroupMembers(req.params.id as string);
       res.json(members);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get members" });
@@ -176,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/groups/:id/leaderboard", requireAuth, async (req: Request, res: Response) => {
     try {
-      const leaderboard = await storage.getLeaderboard(req.params.id);
+      const leaderboard = await storage.getLeaderboard(req.params.id as string);
       res.json(leaderboard);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get leaderboard" });
@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/groups/:id/leave", requireAuth, async (req: Request, res: Response) => {
     try {
-      await storage.leaveGroup(req.params.id, req.session.userId!);
+      await storage.leaveGroup(req.params.id as string, req.session.userId!);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to leave group" });
@@ -232,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/logs/:groupId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const logs = await storage.getUserLogsForGroup(req.session.userId!, req.params.groupId);
+      const logs = await storage.getUserLogsForGroup(req.session.userId!, req.params.groupId as string);
       res.json(logs);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get logs" });
@@ -241,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/logs/:groupId/:date", requireAuth, async (req: Request, res: Response) => {
     try {
-      await storage.deleteLogForDate(req.session.userId!, req.params.groupId, req.params.date);
+      await storage.deleteLogForDate(req.session.userId!, req.params.groupId as string, req.params.date as string);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to delete log" });
