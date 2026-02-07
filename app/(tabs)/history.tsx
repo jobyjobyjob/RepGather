@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { format, parseISO, eachDayOfInterval, subDays } from 'date-fns';
+import {
+  format,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  isBefore,
+  isAfter,
+} from 'date-fns';
 
 import Colors from '@/constants/colors';
 import { usePushups, Challenge } from '@/contexts/PushupContext';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   challenges: Challenge[];
@@ -65,6 +81,97 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   );
 }
 
+function MonthCalendar({ month, logs, onDayPress, colors, challengeStartDate, challengeEndDate }: {
+  month: Date;
+  logs: Array<{ id: string; date: string; count: number }>;
+  onDayPress: (date: string) => void;
+  colors: any;
+  challengeStartDate?: string;
+  challengeEndDate?: string;
+}) {
+  const today = new Date();
+
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    const calStart = startOfWeek(monthStart);
+    const calEnd = endOfWeek(monthEnd);
+    return eachDayOfInterval({ start: calStart, end: calEnd });
+  }, [month]);
+
+  const logMap = useMemo(() => {
+    const map = new Map<string, number>();
+    logs.forEach(log => map.set(log.date, log.count));
+    return map;
+  }, [logs]);
+
+  const chalStart = challengeStartDate ? parseISO(challengeStartDate) : null;
+  const chalEnd = challengeEndDate ? parseISO(challengeEndDate) : null;
+
+  return (
+    <View style={[styles.calendarCard, { backgroundColor: colors.card }]}>
+      <View style={styles.weekdayRow}>
+        {WEEKDAYS.map((day) => (
+          <View key={day} style={styles.calCell}>
+            <Text style={[styles.weekdayText, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+              {day}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.daysGrid}>
+        {calendarDays.map((day, index) => {
+          const inCurrentMonth = isSameMonth(day, month);
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const count = logMap.get(dateStr) || 0;
+          const hasActivity = count > 0;
+          const isToday = isSameDay(day, today);
+
+          const inChallengeRange = chalStart && chalEnd
+            ? (isSameDay(day, chalStart) || isAfter(day, chalStart)) && (isSameDay(day, chalEnd) || isBefore(day, chalEnd))
+            : true;
+
+          return (
+            <Pressable
+              key={index}
+              onPress={() => {
+                if (inCurrentMonth && inChallengeRange) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onDayPress(dateStr);
+                }
+              }}
+              style={styles.calCell}
+            >
+              <View style={[
+                styles.calDayOuter,
+                hasActivity && inCurrentMonth && { backgroundColor: colors.tint },
+                isToday && !hasActivity && inCurrentMonth && { borderWidth: 1.5, borderColor: colors.tint },
+                !inCurrentMonth && { opacity: 0.2 },
+                inCurrentMonth && !inChallengeRange && { opacity: 0.3 },
+              ]}>
+                <Text style={[
+                  styles.calDayText,
+                  { fontFamily: 'Inter_500Medium' },
+                  inCurrentMonth ? { color: colors.text } : { color: colors.textSecondary },
+                  hasActivity && inCurrentMonth && { color: '#FFFFFF', fontFamily: 'Inter_700Bold' },
+                ]}>
+                  {format(day, 'd')}
+                </Text>
+              </View>
+              {hasActivity && inCurrentMonth && (
+                <Text style={[styles.calDayCount, { color: colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
+                  {count}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function HistoryScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -72,6 +179,8 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
 
   const { isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge } = usePushups();
+
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const exerciseLabel = activeChallenge?.exerciseType?.toLowerCase() || 'reps';
 
@@ -82,6 +191,16 @@ export default function HistoryScreen() {
 
   const handleChallengeSelect = (id: string) => {
     setActiveChallenge(id);
+  };
+
+  const handlePrevMonth = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentMonth(addMonths(currentMonth, 1));
   };
 
   if (isLoading) {
@@ -137,16 +256,6 @@ export default function HistoryScreen() {
       </View>
     );
   }
-
-  const last7Days = eachDayOfInterval({
-    start: subDays(new Date(), 6),
-    end: new Date(),
-  });
-
-  const getLogForDate = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return logs.find(log => log.date === dateStr);
-  };
 
   const sortedLogs = [...logs].sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -208,51 +317,28 @@ export default function HistoryScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-            Last 7 Days
-          </Text>
-          <View style={[styles.weekCard, { backgroundColor: colors.card }]}>
-            <View style={styles.weekRow}>
-              {last7Days.map((date, index) => {
-                const log = getLogForDate(date);
-                const hasActivity = log && log.count > 0;
-                const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-                const dateStr = format(date, 'yyyy-MM-dd');
-
-                return (
-                  <Pressable
-                    key={index}
-                    style={styles.dayColumn}
-                    onPress={() => handleEditLog(dateStr)}
-                  >
-                    <Text style={[styles.dayLabel, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-                      {format(date, 'EEE')}
-                    </Text>
-                    <View
-                      style={[
-                        styles.dayCircle,
-                        {
-                          backgroundColor: hasActivity ? colors.tint : colors.progressBackground,
-                          borderWidth: isToday ? 2 : 0,
-                          borderColor: colors.tint,
-                        },
-                      ]}
-                    >
-                      {hasActivity && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                      )}
-                    </View>
-                    <Text style={[styles.dayCount, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                      {log?.count || 0}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={[styles.weekHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              Tap any day to edit
+          <View style={styles.monthNavRow}>
+            <Pressable onPress={handlePrevMonth} style={styles.monthNavBtn}>
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </Pressable>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+              {format(currentMonth, 'MMMM yyyy')}
             </Text>
+            <Pressable onPress={handleNextMonth} style={styles.monthNavBtn}>
+              <Ionicons name="chevron-forward" size={22} color={colors.text} />
+            </Pressable>
           </View>
+          <MonthCalendar
+            month={currentMonth}
+            logs={logs}
+            onDayPress={handleEditLog}
+            colors={colors}
+            challengeStartDate={activeChallenge.startDate}
+            challengeEndDate={activeChallenge.endDate}
+          />
+          <Text style={[styles.calHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+            Tap any day to edit
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -383,35 +469,56 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
+    textAlign: 'center',
   },
-  weekCard: {
-    padding: 20,
-    borderRadius: 20,
-    gap: 12,
-  },
-  weekRow: {
+  monthNavRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  dayColumn: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  dayLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-  },
-  dayCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  monthNavBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayCount: {
+  calendarCard: {
+    borderRadius: 20,
+    padding: 12,
+    paddingBottom: 8,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    paddingBottom: 8,
+  },
+  calCell: {
+    width: '14.28%',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  weekdayText: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calDayOuter: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calDayText: {
     fontSize: 14,
   },
-  weekHint: {
+  calDayCount: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  calHint: {
     fontSize: 12,
     textAlign: 'center',
   },
