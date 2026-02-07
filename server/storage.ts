@@ -40,6 +40,7 @@ export async function createGroup(data: {
   totalGoal: number;
   startDate: string;
   endDate: string;
+  isPersonal?: boolean;
   createdBy: string;
 }): Promise<Group> {
   const inviteCode = generateInviteCode();
@@ -50,6 +51,7 @@ export async function createGroup(data: {
     totalGoal: data.totalGoal,
     startDate: data.startDate,
     endDate: data.endDate,
+    isPersonal: data.isPersonal || false,
     createdBy: data.createdBy,
     inviteCode,
   }).returning();
@@ -79,7 +81,7 @@ export async function joinGroup(groupId: string, userId: string): Promise<void> 
   }).onConflictDoNothing();
 }
 
-export async function getGroupsForUser(userId: string) {
+export async function getChallengesForUser(userId: string) {
   const memberships = await db
     .select({
       group: groups,
@@ -94,6 +96,10 @@ export async function getGroupsForUser(userId: string) {
     ...m.group,
     myIndividualGoal: m.individualGoal,
   }));
+}
+
+export async function getGroupsForUser(userId: string) {
+  return getChallengesForUser(userId);
 }
 
 export async function getGroupMembers(groupId: string) {
@@ -228,4 +234,14 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
   await db
     .delete(dailyLogs)
     .where(and(eq(dailyLogs.groupId, groupId), eq(dailyLogs.userId, userId)));
+}
+
+export async function deleteChallenge(groupId: string, userId: string): Promise<void> {
+  const group = await getGroup(groupId);
+  if (!group) return;
+  if (group.createdBy !== userId) return;
+
+  await db.delete(dailyLogs).where(eq(dailyLogs.groupId, groupId));
+  await db.delete(groupMembers).where(eq(groupMembers.groupId, groupId));
+  await db.delete(groups).where(eq(groups.id, groupId));
 }

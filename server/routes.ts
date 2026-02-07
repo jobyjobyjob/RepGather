@@ -105,6 +105,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Challenges endpoint - returns all challenges (personal + group) for user
+  app.get("/api/challenges", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const challenges = await storage.getChallengesForUser(req.session.userId!);
+      res.json(challenges);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get challenges" });
+    }
+  });
+
+  // Create personal challenge
+  app.post("/api/challenges/personal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { name, exerciseType, totalGoal, startDate, endDate } = req.body;
+      if (!name || !totalGoal || !startDate || !endDate) {
+        return res.status(400).json({ message: "Name, goal, start date, and end date are required" });
+      }
+      const group = await storage.createGroup({
+        name,
+        exerciseType: exerciseType || "Push-ups",
+        goalType: "group",
+        totalGoal,
+        startDate,
+        endDate,
+        isPersonal: true,
+        createdBy: req.session.userId!,
+      });
+      res.json(group);
+    } catch (error: any) {
+      console.error("Create personal challenge error:", error);
+      res.status(500).json({ message: "Failed to create personal challenge" });
+    }
+  });
+
+  // Delete a challenge (personal only, or group if creator)
+  app.delete("/api/challenges/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteChallenge(req.params.id as string, req.session.userId!);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete challenge error:", error);
+      res.status(500).json({ message: "Failed to delete challenge" });
+    }
+  });
+
   // Group routes
   app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -122,6 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalGoal,
         startDate,
         endDate,
+        isPersonal: false,
         createdBy: req.session.userId!,
       });
       res.json(group);
@@ -161,6 +207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const group = await storage.getGroupByInviteCode(inviteCode.toUpperCase());
       if (!group) {
         return res.status(404).json({ message: "No group found with that code" });
+      }
+      if (group.isPersonal) {
+        return res.status(400).json({ message: "Cannot join a personal challenge" });
       }
       await storage.joinGroup(group.id, req.session.userId!);
       res.json(group);
