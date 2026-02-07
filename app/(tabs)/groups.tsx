@@ -152,8 +152,12 @@ export default function GroupsScreen() {
   const setIndividualGoalMutation = useMutation({
     mutationFn: async ({ groupId, goal }: { groupId: string; goal: number }) => {
       await apiRequest("PUT", `/api/groups/${groupId}/individual-goal`, { goal });
+      return { groupId, goal };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (selectedGroup) {
+        setSelectedGroup({ ...selectedGroup, myIndividualGoal: data.goal });
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
       queryClient.invalidateQueries({ queryKey: ['/api/groups', selectedGroup?.id, 'leaderboard'] });
       queryClient.invalidateQueries({ queryKey: ['/api/groups', selectedGroup?.id, 'members'] });

@@ -109,8 +109,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
     try {
       const { name, exerciseType, goalType, totalGoal, startDate, endDate } = req.body;
-      if (!name || !totalGoal || !startDate || !endDate) {
+      if (!name || !startDate || !endDate) {
         return res.status(400).json({ message: "All fields are required" });
+      }
+      if (goalType !== 'individual' && (!totalGoal || totalGoal < 1)) {
+        return res.status(400).json({ message: "Goal is required for group goal type" });
       }
       const group = await storage.createGroup({
         name,
