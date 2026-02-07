@@ -7,12 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, differenceInCalendarDays } from 'date-fns';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePushups } from '@/contexts/PushupContext';
 import { apiRequest, queryClient } from '@/lib/query-client';
 import { EXERCISE_TYPES } from '@shared/schema';
+import CalendarDateRangePicker from '@/components/CalendarDateRangePicker';
 
 type ViewMode = 'list' | 'create' | 'join' | 'detail';
 
@@ -70,19 +71,8 @@ export default function GroupsScreen() {
   const [individualGoalInput, setIndividualGoalInput] = useState('');
   const [showSetGoal, setShowSetGoal] = useState(false);
 
-  const [selectedMonth, setSelectedMonth] = useState(0);
-  const [startDay, setStartDay] = useState(1);
-  const [endDay, setEndDay] = useState(28);
-
-  const months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() + i);
-    return d;
-  });
-
-  const currentMonth = months[selectedMonth];
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+  const [calStartDate, setCalStartDate] = useState<Date | null>(null);
+  const [calEndDate, setCalEndDate] = useState<Date | null>(null);
 
   const groupsQuery = useQuery<GroupData[]>({
     queryKey: ['/api/groups'],
@@ -177,12 +167,13 @@ export default function GroupsScreen() {
       setCreateError('Enter a valid goal');
       return;
     }
+    if (!calStartDate || !calEndDate) {
+      setCreateError('Select start and end dates');
+      return;
+    }
 
-    const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), startDay);
-    const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), endDay);
-
-    const sd = format(startDate, 'yyyy-MM-dd');
-    const ed = format(endDate, 'yyyy-MM-dd');
+    const sd = format(calStartDate, 'yyyy-MM-dd');
+    const ed = format(calEndDate, 'yyyy-MM-dd');
 
     createGroupMutation.mutate({
       name: groupName.trim(),
@@ -446,99 +437,28 @@ export default function GroupsScreen() {
         </>
       )}
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>CHALLENGE MONTH</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthRow}>
-        {months.map((m, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[
-              styles.monthChip,
-              { borderColor: colors.border },
-              selectedMonth === i && { backgroundColor: colors.tint, borderColor: colors.tint },
-            ]}
-            onPress={() => {
-              setSelectedMonth(i);
-              setStartDay(1);
-              const nd = new Date(months[i].getFullYear(), months[i].getMonth() + 1, 0).getDate();
-              setEndDay(nd);
-            }}
-          >
-            <Text style={[
-              styles.monthChipText,
-              { color: colors.text },
-              selectedMonth === i && { color: '#fff' },
-            ]}>{format(m, 'MMM yyyy')}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>CHALLENGE DATES</Text>
+      <CalendarDateRangePicker
+        startDate={calStartDate}
+        endDate={calEndDate}
+        onSelectStart={(d) => { setCalStartDate(d); setCalEndDate(null); }}
+        onSelectEnd={setCalEndDate}
+      />
 
-      <View style={styles.datePickerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>START DAY</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
-              <TouchableOpacity
-                key={d}
-                style={[
-                  styles.dayChip,
-                  { borderColor: colors.border },
-                  startDay === d && { backgroundColor: colors.tint, borderColor: colors.tint },
-                ]}
-                onPress={() => {
-                  setStartDay(d);
-                  if (d > endDay) setEndDay(d);
-                }}
-              >
-                <Text style={[
-                  styles.dayChipText,
-                  { color: colors.text },
-                  startDay === d && { color: '#fff' },
-                ]}>{d}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+      {calStartDate && calEndDate && (
+        <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {goalType === 'group' && parseInt(groupGoal) > 0 && (
+            <Text style={[styles.summaryTarget, { color: colors.tint }]}>
+              ~{Math.ceil(parseInt(groupGoal) / (differenceInCalendarDays(calEndDate, calStartDate) + 1))} {getExerciseUnit(exerciseType)}/day per member
+            </Text>
+          )}
+          {goalType === 'individual' && (
+            <Text style={[styles.summaryTarget, { color: colors.tint }]}>
+              Members will set their own goals after joining
+            </Text>
+          )}
         </View>
-      </View>
-      <View style={styles.datePickerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>END DAY</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {Array.from({ length: daysInMonth - startDay + 1 }, (_, i) => startDay + i).map(d => (
-              <TouchableOpacity
-                key={d}
-                style={[
-                  styles.dayChip,
-                  { borderColor: colors.border },
-                  endDay === d && { backgroundColor: colors.tint, borderColor: colors.tint },
-                ]}
-                onPress={() => setEndDay(d)}
-              >
-                <Text style={[
-                  styles.dayChipText,
-                  { color: colors.text },
-                  endDay === d && { color: '#fff' },
-                ]}>{d}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-
-      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.summaryText, { color: colors.textSecondary }]}>
-          {format(currentMonth, 'MMM')} {startDay} - {format(currentMonth, 'MMM')} {endDay}, {currentMonth.getFullYear()} ({endDay - startDay + 1} days)
-        </Text>
-        {goalType === 'group' && parseInt(groupGoal) > 0 && (
-          <Text style={[styles.summaryTarget, { color: colors.tint }]}>
-            ~{Math.ceil(parseInt(groupGoal) / (endDay - startDay + 1))} {getExerciseUnit(exerciseType)}/day per member
-          </Text>
-        )}
-        {goalType === 'individual' && (
-          <Text style={[styles.summaryTarget, { color: colors.tint }]}>
-            Members will set their own goals after joining
-          </Text>
-        )}
-      </View>
+      )}
 
       {createError ? <Text style={[styles.errorText, { color: colors.error }]}>{createError}</Text> : null}
 
