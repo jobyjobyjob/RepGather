@@ -56,7 +56,7 @@ export default function GroupsScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { activeChallengeId, setActiveChallenge: setActiveGroupCtx } = usePushups();
+  const { activeChallengeId, setActiveChallenge: setActiveGroupCtx, refresh } = usePushups();
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null);
@@ -136,6 +136,8 @@ export default function GroupsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+      refresh();
       setViewMode('list');
       setSelectedGroup(null);
     },
@@ -208,6 +210,7 @@ export default function GroupsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
       queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+      refresh();
       setViewMode('list');
       setSelectedGroup(null);
     },

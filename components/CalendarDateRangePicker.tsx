@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, Pressable, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View, Pressable, useColorScheme, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -67,6 +67,7 @@ export default function CalendarDateRangePicker({
   const handleDayPress = (day: Date) => {
     if (isBefore(day, effectiveMinDate)) return;
 
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (!selectingEnd || !startDate) {

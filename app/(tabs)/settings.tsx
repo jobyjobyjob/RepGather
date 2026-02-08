@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator, PanResponder, Animated as RNAnimated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,8 +7,66 @@ import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 
 import Colors from '@/constants/colors';
-import { usePushups } from '@/contexts/PushupContext';
+import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
+
+function SwipeableChallenge({ challenge, onDelete, colors }: { challenge: Challenge; onDelete: (id: string, name: string) => void; colors: any }) {
+  const translateX = useRef(new RNAnimated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          translateX.setValue(Math.max(gestureState.dx, -100));
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -60) {
+          RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true }).start();
+        } else {
+          RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  const resetSwipe = () => {
+    RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+  };
+
+  return (
+    <View style={[styles.swipeContainer, { overflow: 'hidden', borderRadius: 16 }]}>
+      <Pressable
+        onPress={() => {
+          resetSwipe();
+          onDelete(challenge.id, challenge.name);
+        }}
+        style={[styles.deleteBackground, { backgroundColor: colors.error }]}
+      >
+        <Ionicons name="trash" size={22} color="#FFFFFF" />
+      </Pressable>
+      <RNAnimated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.challengeRow,
+          { backgroundColor: colors.card, transform: [{ translateX }] },
+        ]}
+      >
+        <View style={styles.challengeInfo}>
+          <Text style={[styles.challengeName, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            {challenge.name}
+          </Text>
+          <Text style={[styles.challengeMeta, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+            {challenge.exerciseType} - {challenge.totalGoal.toLocaleString()} total
+          </Text>
+        </View>
+        <Ionicons name="chevron-back" size={16} color={colors.textSecondary} style={{ opacity: 0.4 }} />
+      </RNAnimated.View>
+    </View>
+  );
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -106,50 +164,29 @@ export default function SettingsScreen() {
             <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
               ACTIVE CHALLENGE
             </Text>
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.goalInfo}>
-                <View style={[styles.goalIcon, { backgroundColor: colors.tint + '20' }]}>
-                  <Ionicons name={activeChallenge.isPersonal ? "person" : "people"} size={24} color={colors.tint} />
-                </View>
-                <View style={styles.goalDetails}>
-                  <Text style={[styles.goalValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-                    {activeChallenge.name}
-                  </Text>
-                  <Text style={[styles.goalDate, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                    {activeChallenge.totalGoal.toLocaleString()} {activeChallenge.exerciseType.toLowerCase()} goal
-                  </Text>
-                </View>
-              </View>
-            </View>
+            <SwipeableChallenge
+              challenge={activeChallenge}
+              onDelete={handleDeleteChallenge}
+              colors={colors}
+            />
+            <Text style={[styles.swipeHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Swipe left to delete
+            </Text>
           </View>
         )}
 
-        {personalChallenges.length > 0 && (
+        {challenges.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
-              MY CHALLENGES
+              ALL CHALLENGES
             </Text>
-            {personalChallenges.map((challenge) => (
-              <View key={challenge.id} style={[styles.challengeRow, { backgroundColor: colors.card }]}>
-                <View style={styles.challengeInfo}>
-                  <Text style={[styles.challengeName, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                    {challenge.name}
-                  </Text>
-                  <Text style={[styles.challengeMeta, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                    {challenge.exerciseType} - {challenge.totalGoal.toLocaleString()} total
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => handleDeleteChallenge(challenge.id, challenge.name)}
-                  style={({ pressed }) => [
-                    styles.deleteBtn,
-                    { backgroundColor: colors.error + '15' },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Ionicons name="trash" size={18} color={colors.error} />
-                </Pressable>
-              </View>
+            {challenges.map((challenge) => (
+              <SwipeableChallenge
+                key={challenge.id}
+                challenge={challenge}
+                onDelete={handleDeleteChallenge}
+                colors={colors}
+              />
             ))}
           </View>
         )}
@@ -285,6 +322,19 @@ const styles = StyleSheet.create({
   challengeName: { fontSize: 16 },
   challengeMeta: { fontSize: 13 },
   deleteBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  swipeContainer: { position: 'relative' },
+  deleteBackground: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  swipeHint: { fontSize: 12, textAlign: 'center', marginTop: -4 },
   footer: { alignItems: 'center', paddingVertical: 20 },
   footerText: { fontSize: 14 },
 });

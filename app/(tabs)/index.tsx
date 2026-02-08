@@ -11,7 +11,6 @@ import Colors from '@/constants/colors';
 import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
-import { CounterButton } from '@/components/CounterButton';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
 import { ConfettiCelebration } from '@/components/ConfettiCelebration';
 
@@ -188,20 +187,28 @@ export default function TodayScreen() {
 
   const {
     isLoading, challenges, activeChallengeId, activeChallenge,
-    logs, progress, logActivity, setActiveChallenge,
+    logs, progress, logActivity, updateLog, setActiveChallenge,
     deleteChallenge, completeChallenge,
   } = usePushups();
   const { user } = useAuth();
-  const [dayFinished, setDayFinished] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [goalCelebrated, setGoalCelebrated] = useState(false);
   const prevPercentRef = useRef<number>(0);
+  const [localCount, setLocalCount] = useState<number | null>(null);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
 
   const finishScale = useSharedValue(1);
   const finishAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: finishScale.value }],
   }));
+
+  const serverTodayCount = progress?.todayCount || 0;
+
+  useEffect(() => {
+    setLocalCount(serverTodayCount);
+    setSavedCount(serverTodayCount);
+  }, [serverTodayCount]);
 
   useEffect(() => {
     const currentPercent = progress?.percentComplete || 0;
@@ -220,14 +227,23 @@ export default function TodayScreen() {
   useEffect(() => {
     setGoalCelebrated(false);
     prevPercentRef.current = 0;
+    setLocalCount(null);
+    setSavedCount(null);
   }, [activeChallengeId]);
 
+  const currentCount = localCount ?? serverTodayCount;
+  const hasUnsavedChanges = localCount !== null && localCount !== savedCount;
+
   const handleIncrement = () => {
-    logActivity(1);
+    setLocalCount((prev) => (prev ?? serverTodayCount) + 1);
+  };
+
+  const handleDecrement = () => {
+    setLocalCount((prev) => Math.max(0, (prev ?? serverTodayCount) - 1));
   };
 
   const handleQuickAdd = (count: number) => {
-    logActivity(count);
+    setLocalCount((prev) => (prev ?? serverTodayCount) + count);
   };
 
   const exerciseLabel = activeChallenge?.exerciseType?.toLowerCase() || 'reps';
@@ -265,25 +281,19 @@ export default function TodayScreen() {
     }
   };
 
-  const handleFinishDay = () => {
+  const handleSaveDay = async () => {
+    if (!hasUnsavedChanges || localCount === null) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     finishScale.value = withSequence(
       withSpring(1.1, { damping: 10, stiffness: 400 }),
       withSpring(1, { damping: 10, stiffness: 400 })
     );
-    if (!dayFinished) {
-      setDayFinished(true);
-      const msg = getEncouragementMessage();
-      Alert.alert(
-        `${msg.text} ${msg.emoji}`,
-        `You logged ${progress?.todayCount || 0} ${exerciseLabel} today!`,
-        [{ text: 'Awesome!', onPress: () => {} }]
-      );
-    }
+    const today = new Date().toISOString().split('T')[0];
+    await updateLog(today, localCount);
+    setSavedCount(localCount);
   };
 
   const handleChallengeSelect = (id: string) => {
-    setDayFinished(false);
     setActiveChallenge(id);
   };
 
@@ -404,9 +414,8 @@ export default function TodayScreen() {
   }
 
   const dynamicTarget = progress?.dynamicDailyTarget || 0;
-  const todayCount = progress?.todayCount || 0;
-  const todayProgress = dynamicTarget > 0 ? Math.min(100, (todayCount / dynamicTarget) * 100) : 0;
-  const todayComplete = dynamicTarget > 0 && todayCount >= dynamicTarget;
+  const todayProgress = dynamicTarget > 0 ? Math.min(100, (currentCount / dynamicTarget) * 100) : 0;
+  const todayComplete = dynamicTarget > 0 && currentCount >= dynamicTarget;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -426,7 +435,7 @@ export default function TodayScreen() {
             {getGreeting()}{user ? `, ${user.displayName}` : ''}
           </Text>
           <Text style={[styles.title, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-            {todayCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
+            {currentCount === 0 ? "Let's get started!" : todayComplete ? "Target reached!" : "Keep pushing!"}
           </Text>
         </View>
 
@@ -439,14 +448,14 @@ export default function TodayScreen() {
 
         <View style={styles.progressSection}>
           <ProgressRing
-            progress={progress?.percentComplete || 0}
+            progress={Math.min(100, progress?.percentComplete || 0)}
             size={200}
             strokeWidth={16}
             progressColor={colors.tint}
             backgroundColor={colors.progressBackground}
           >
             <Text style={[styles.progressPercent, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-              {Math.round(progress?.percentComplete || 0)}%
+              {Math.min(100, Math.round(progress?.percentComplete || 0))}%
             </Text>
             <Text style={[styles.progressLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
               of goal
@@ -482,19 +491,55 @@ export default function TodayScreen() {
               />
             </View>
             <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              {todayCount} / {dynamicTarget}
+              {currentCount} / {dynamicTarget}
               {todayComplete && ' - Complete!'}
             </Text>
           </View>
         </View>
 
-        <CounterButton
-          count={todayCount}
-          onIncrement={handleIncrement}
-          tintColor={colors.tint}
-          textColor={colors.text}
-          exerciseLabel={exerciseLabel}
-        />
+        <View style={styles.counterSection}>
+          <View style={styles.counterRow}>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleDecrement();
+              }}
+              style={({ pressed }) => [
+                styles.adjustButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
+              ]}
+            >
+              <Ionicons name="remove" size={28} color={colors.text} />
+            </Pressable>
+
+            <View style={styles.counterCenter}>
+              <Text style={[styles.counterValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                {currentCount}
+              </Text>
+              <Text style={[styles.counterLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                today
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleIncrement();
+              }}
+              style={({ pressed }) => [
+                styles.addButton,
+                { backgroundColor: colors.tint },
+                pressed && { opacity: 0.9, transform: [{ scale: 0.95 }] },
+              ]}
+            >
+              <Ionicons name="add" size={28} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          <Text style={[styles.counterHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+            Tap +/- to adjust {exerciseLabel}
+          </Text>
+        </View>
 
         <QuickAddButtons
           onAdd={handleQuickAdd}
@@ -503,36 +548,35 @@ export default function TodayScreen() {
           accentColor={colors.tint}
         />
 
-        {todayCount > 0 && (
-          <Animated.View style={finishAnimStyle}>
-            <Pressable
-              onPress={handleFinishDay}
-              style={({ pressed }) => [
-                styles.finishButton,
-                {
-                  backgroundColor: dayFinished ? colors.success + '15' : colors.card,
-                  borderColor: dayFinished ? colors.success : colors.border,
-                },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <Ionicons
-                name={dayFinished ? "checkmark-circle" : "checkmark-circle-outline"}
-                size={24}
-                color={dayFinished ? colors.success : colors.textSecondary}
-              />
-              <Text style={[
-                styles.finishButtonText,
-                {
-                  color: dayFinished ? colors.success : colors.textSecondary,
-                  fontFamily: 'Inter_600SemiBold',
-                }
-              ]}>
-                {dayFinished ? 'Day Complete' : 'Finish Day'}
-              </Text>
-            </Pressable>
-          </Animated.View>
-        )}
+        <Animated.View style={finishAnimStyle}>
+          <Pressable
+            onPress={handleSaveDay}
+            disabled={!hasUnsavedChanges}
+            style={({ pressed }) => [
+              styles.finishButton,
+              hasUnsavedChanges
+                ? { backgroundColor: colors.tint, borderColor: colors.tint }
+                : { backgroundColor: colors.success + '15', borderColor: colors.success },
+              pressed && hasUnsavedChanges && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              !hasUnsavedChanges && { opacity: 0.9 },
+            ]}
+          >
+            <Ionicons
+              name={hasUnsavedChanges ? "checkmark-circle-outline" : "checkmark-circle"}
+              size={24}
+              color={hasUnsavedChanges ? '#FFFFFF' : colors.success}
+            />
+            <Text style={[
+              styles.finishButtonText,
+              {
+                color: hasUnsavedChanges ? '#FFFFFF' : colors.success,
+                fontFamily: 'Inter_600SemiBold',
+              }
+            ]}>
+              {hasUnsavedChanges ? 'Complete Day' : 'Day Completed'}
+            </Text>
+          </Pressable>
+        </Animated.View>
 
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: colors.card }]}>
@@ -820,5 +864,49 @@ const styles = StyleSheet.create({
   },
   finishButtonText: {
     fontSize: 18,
+  },
+  counterSection: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 24,
+  },
+  counterCenter: {
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  counterValue: {
+    fontSize: 56,
+    lineHeight: 64,
+  },
+  counterLabel: {
+    fontSize: 15,
+    marginTop: -4,
+  },
+  adjustButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  counterHint: {
+    fontSize: 13,
   },
 });

@@ -66,7 +66,7 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
     goalValue = challenge.myIndividualGoal;
   }
 
-  const percentComplete = goalValue > 0 ? Math.min(100, (totalCompleted / goalValue) * 100) : 0;
+  const percentComplete = goalValue > 0 ? (totalCompleted / goalValue) * 100 : 0;
 
   const today = startOfDay(new Date());
   const end = startOfDay(parseISO(challenge.endDate));
