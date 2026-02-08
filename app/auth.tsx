@@ -1,10 +1,57 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, useColorScheme, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, useColorScheme, Platform, KeyboardAvoidingView, ScrollView, Modal, FlatList, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { AGE_RANGES, GENDER_OPTIONS } from '@shared/schema';
+
+function PickerModal({ visible, onClose, options, selectedValue, onSelect, title, colors }: {
+  visible: boolean;
+  onClose: () => void;
+  options: readonly string[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  title: string;
+  colors: any;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={pickerStyles.overlay}>
+        <View style={[pickerStyles.container, { backgroundColor: colors.card }]}>
+          <View style={pickerStyles.header}>
+            <Text style={[pickerStyles.title, { color: colors.text }]}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <FlatList
+            data={options}
+            keyExtractor={(item) => item}
+            renderItem={({ item }) => {
+              const isSelected = item === selectedValue;
+              return (
+                <Pressable
+                  onPress={() => { onSelect(item); onClose(); }}
+                  style={[pickerStyles.option, {
+                    backgroundColor: isSelected ? colors.tint + '15' : 'transparent',
+                  }]}
+                >
+                  <Text style={[pickerStyles.optionText, {
+                    color: isSelected ? colors.tint : colors.text,
+                    fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_400Regular',
+                  }]}>{item}</Text>
+                  {isSelected && <Ionicons name="checkmark" size={22} color={colors.tint} />}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function AuthScreen() {
   const colorScheme = useColorScheme();
@@ -17,6 +64,10 @@ export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [ageRange, setAgeRange] = useState('');
+  const [gender, setGender] = useState('');
+  const [showAgePicker, setShowAgePicker] = useState(false);
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -30,12 +81,16 @@ export default function AuthScreen() {
       setError('Please enter a display name');
       return;
     }
+    if (!isLogin && (!ageRange || !gender)) {
+      setError('Please select your age range and gender');
+      return;
+    }
     setLoading(true);
     try {
       if (isLogin) {
         await login(username.trim(), password.trim());
       } else {
-        await register(username.trim(), displayName.trim(), password.trim());
+        await register(username.trim(), displayName.trim(), password.trim(), ageRange, gender);
       }
     } catch (err: any) {
       const msg = err?.message || 'Something went wrong';
@@ -122,6 +177,34 @@ export default function AuthScreen() {
               />
             </View>
 
+            {!isLogin && (
+              <>
+                <Pressable
+                  onPress={() => setShowAgePicker(true)}
+                  style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  testID="auth-age-range"
+                >
+                  <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                  <Text style={[styles.input, { color: ageRange ? colors.text : colors.textSecondary }]}>
+                    {ageRange || 'Age Range'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setShowGenderPicker(true)}
+                  style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  testID="auth-gender"
+                >
+                  <Ionicons name="people-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                  <Text style={[styles.input, { color: gender ? colors.text : colors.textSecondary }]}>
+                    {gender || 'Gender'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </Pressable>
+              </>
+            )}
+
             {error ? (
               <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
             ) : null}
@@ -166,9 +249,66 @@ export default function AuthScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PickerModal
+        visible={showAgePicker}
+        onClose={() => setShowAgePicker(false)}
+        options={AGE_RANGES}
+        selectedValue={ageRange}
+        onSelect={setAgeRange}
+        title="Select Age Range"
+        colors={colors}
+      />
+
+      <PickerModal
+        visible={showGenderPicker}
+        onClose={() => setShowGenderPicker(false)}
+        options={GENDER_OPTIONS}
+        selectedValue={gender}
+        onSelect={setGender}
+        title="Select Gender"
+        colors={colors}
+      />
     </View>
   );
 }
+
+const pickerStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  container: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: '60%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
+  title: {
+    fontSize: 18,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  optionText: {
+    fontSize: 16,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

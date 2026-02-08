@@ -5,13 +5,15 @@ interface AuthUser {
   id: string;
   username: string;
   displayName: string;
+  ageRange?: string | null;
+  gender?: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, displayName: string, password: string) => Promise<void>;
+  register: (username: string, displayName: string, password: string, ageRange: string, gender: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -43,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data);
   }, []);
 
-  const register = useCallback(async (username: string, displayName: string, password: string) => {
-    const res = await apiRequest("POST", "/api/auth/register", { username, displayName, password });
+  const register = useCallback(async (username: string, displayName: string, password: string, ageRange: string, gender: string) => {
+    const res = await apiRequest("POST", "/api/auth/register", { username, displayName, password, ageRange, gender });
     const data = await res.json();
     setUser(data);
   }, []);

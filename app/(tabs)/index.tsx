@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withDelay, Easing } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import Colors from '@/constants/colors';
 import { usePushups, Challenge } from '@/contexts/PushupContext';
@@ -12,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CounterButton } from '@/components/CounterButton';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
+import { ConfettiCelebration } from '@/components/ConfettiCelebration';
 
 function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   challenges: Challenge[];
@@ -69,6 +71,115 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   );
 }
 
+function AchievementModal({ visible, onComplete, onKeepGoing, onDelete, colors, exerciseLabel, totalCompleted, goalValue }: {
+  visible: boolean;
+  onComplete: () => void;
+  onKeepGoing: () => void;
+  onDelete: () => void;
+  colors: any;
+  exerciseLabel: string;
+  totalCompleted: number;
+  goalValue: number;
+}) {
+  const trophyScale = useSharedValue(0);
+  const trophyRotate = useSharedValue(-15);
+
+  useEffect(() => {
+    if (visible) {
+      trophyScale.value = withDelay(200, withSpring(1, { damping: 8, stiffness: 120 }));
+      trophyRotate.value = withDelay(200, withSequence(
+        withTiming(15, { duration: 200 }),
+        withTiming(-10, { duration: 200 }),
+        withTiming(5, { duration: 150 }),
+        withTiming(0, { duration: 150 })
+      ));
+    } else {
+      trophyScale.value = 0;
+      trophyRotate.value = -15;
+    }
+  }, [visible]);
+
+  const trophyAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: trophyScale.value },
+      { rotate: `${trophyRotate.value}deg` },
+    ],
+  }));
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={achieveStyles.overlay}>
+        <View style={[achieveStyles.container, { backgroundColor: colors.card }]}>
+          <Animated.View style={[achieveStyles.trophyContainer, trophyAnimStyle]}>
+            <LinearGradient
+              colors={['#FFD700', '#FFA500']}
+              style={achieveStyles.trophyGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={achieveStyles.trophyEmoji}>{"\uD83C\uDFC6"}</Text>
+            </LinearGradient>
+          </Animated.View>
+
+          <Text style={[achieveStyles.title, { color: colors.text }]}>
+            You've achieved your goal! {"\uD83C\uDFC6"}
+          </Text>
+          <Text style={[achieveStyles.subtitle, { color: colors.textSecondary }]}>
+            {totalCompleted.toLocaleString()} / {goalValue.toLocaleString()} {exerciseLabel}
+          </Text>
+          <Text style={[achieveStyles.question, { color: colors.text }]}>
+            Would you like to:
+          </Text>
+
+          <View style={achieveStyles.optionsContainer}>
+            <Pressable
+              onPress={onComplete}
+              style={({ pressed }) => [
+                achieveStyles.optionButton,
+                { backgroundColor: colors.success + '15', borderColor: colors.success },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={achieveStyles.optionEmoji}>{"\u2705"}</Text>
+              <Text style={[achieveStyles.optionText, { color: colors.success }]}>
+                Complete and save challenge
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onKeepGoing}
+              style={({ pressed }) => [
+                achieveStyles.optionButton,
+                { backgroundColor: colors.tint + '15', borderColor: colors.tint },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={achieveStyles.optionEmoji}>{"\uD83D\uDCAA"}</Text>
+              <Text style={[achieveStyles.optionText, { color: colors.tint }]}>
+                Keep Going!
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onDelete}
+              style={({ pressed }) => [
+                achieveStyles.optionButton,
+                { backgroundColor: colors.error + '15', borderColor: colors.error },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={achieveStyles.optionEmoji}>{"\u274C"}</Text>
+              <Text style={[achieveStyles.optionText, { color: colors.error }]}>
+                Delete Challenge
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function TodayScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -78,14 +189,38 @@ export default function TodayScreen() {
   const {
     isLoading, challenges, activeChallengeId, activeChallenge,
     logs, progress, logActivity, setActiveChallenge,
+    deleteChallenge, completeChallenge,
   } = usePushups();
   const { user } = useAuth();
   const [dayFinished, setDayFinished] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
+  const [goalCelebrated, setGoalCelebrated] = useState(false);
+  const prevPercentRef = useRef<number>(0);
 
   const finishScale = useSharedValue(1);
   const finishAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: finishScale.value }],
   }));
+
+  useEffect(() => {
+    const currentPercent = progress?.percentComplete || 0;
+    const prevPercent = prevPercentRef.current;
+
+    if (currentPercent >= 100 && prevPercent < 100 && !goalCelebrated && activeChallenge) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowConfetti(true);
+      setShowAchievementModal(true);
+      setGoalCelebrated(true);
+    }
+
+    prevPercentRef.current = currentPercent;
+  }, [progress?.percentComplete, goalCelebrated, activeChallenge]);
+
+  useEffect(() => {
+    setGoalCelebrated(false);
+    prevPercentRef.current = 0;
+  }, [activeChallengeId]);
 
   const handleIncrement = () => {
     logActivity(1);
@@ -150,6 +285,44 @@ export default function TodayScreen() {
   const handleChallengeSelect = (id: string) => {
     setDayFinished(false);
     setActiveChallenge(id);
+  };
+
+  const goalValue = activeChallenge
+    ? (activeChallenge.goalType === 'individual' && activeChallenge.myIndividualGoal
+      ? activeChallenge.myIndividualGoal
+      : activeChallenge.totalGoal)
+    : 0;
+
+  const handleCompleteChallenge = async () => {
+    setShowAchievementModal(false);
+    setShowConfetti(false);
+    if (activeChallenge) {
+      await completeChallenge(activeChallenge.id);
+    }
+  };
+
+  const handleKeepGoing = () => {
+    setShowAchievementModal(false);
+    setShowConfetti(false);
+  };
+
+  const handleDeleteChallenge = () => {
+    setShowAchievementModal(false);
+    setShowConfetti(false);
+    if (activeChallenge) {
+      Alert.alert(
+        'Delete Challenge',
+        'Are you sure? This will permanently delete the challenge and all its data.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deleteChallenge(activeChallenge.id),
+          },
+        ]
+      );
+    }
   };
 
   if (isLoading) {
@@ -229,10 +402,6 @@ export default function TodayScreen() {
       </View>
     );
   }
-
-  const goalValue = activeChallenge.goalType === 'individual' && activeChallenge.myIndividualGoal
-    ? activeChallenge.myIndividualGoal
-    : activeChallenge.totalGoal;
 
   const dynamicTarget = progress?.dynamicDailyTarget || 0;
   const todayCount = progress?.todayCount || 0;
@@ -387,6 +556,19 @@ export default function TodayScreen() {
         </View>
 
       </ScrollView>
+
+      <ConfettiCelebration visible={showConfetti} />
+
+      <AchievementModal
+        visible={showAchievementModal}
+        onComplete={handleCompleteChallenge}
+        onKeepGoing={handleKeepGoing}
+        onDelete={handleDeleteChallenge}
+        colors={colors}
+        exerciseLabel={exerciseLabel}
+        totalCompleted={progress?.totalCompleted || 0}
+        goalValue={goalValue}
+      />
     </View>
   );
 }
@@ -397,6 +579,74 @@ function getGreeting(): string {
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+const achieveStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  container: {
+    width: '100%',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 28,
+    alignItems: 'center',
+  },
+  trophyContainer: {
+    marginBottom: 20,
+  },
+  trophyGradient: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trophyEmoji: {
+    fontSize: 48,
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 16,
+  },
+  question: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 16,
+  },
+  optionsContainer: {
+    width: '100%',
+    gap: 10,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  optionEmoji: {
+    fontSize: 20,
+  },
+  optionText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    flex: 1,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

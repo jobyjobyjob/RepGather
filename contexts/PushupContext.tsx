@@ -53,6 +53,7 @@ interface PushupContextValue {
   refresh: () => Promise<void>;
   createPersonalChallenge: (data: { name: string; exerciseType: string; totalGoal: number; startDate: string; endDate: string }) => Promise<Challenge>;
   deleteChallenge: (challengeId: string) => Promise<void>;
+  completeChallenge: (challengeId: string) => Promise<void>;
 }
 
 const PushupContext = createContext<PushupContextValue | null>(null);
@@ -249,6 +250,18 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
   }, [activeChallengeId, fetchChallenges]);
 
+  const completeChallengeAction = useCallback(async (challengeId: string) => {
+    await apiRequest("POST", `/api/challenges/${challengeId}/complete`);
+    if (activeChallengeId === challengeId) {
+      await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
+      setActiveChallengeIdState(null);
+      setLogs([]);
+    }
+    await fetchChallenges();
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+  }, [activeChallengeId, fetchChallenges]);
+
   const value = useMemo(() => ({
     isLoading,
     challenges,
@@ -263,7 +276,8 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     refresh,
     createPersonalChallenge,
     deleteChallenge: deleteChallengeAction,
-  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction]);
+    completeChallenge: completeChallengeAction,
+  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction, completeChallengeAction]);
 
   return (
     <PushupContext.Provider value={value}>

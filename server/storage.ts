@@ -90,7 +90,7 @@ export async function getChallengesForUser(userId: string) {
     })
     .from(groupMembers)
     .innerJoin(groups, eq(groupMembers.groupId, groups.id))
-    .where(eq(groupMembers.userId, userId));
+    .where(and(eq(groupMembers.userId, userId), eq(groups.status, "active")));
 
   return memberships.map(m => ({
     ...m.group,
