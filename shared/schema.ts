@@ -3,6 +3,23 @@ import { pgTable, text, varchar, integer, date, timestamp, uniqueIndex, boolean 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const AGE_RANGES = [
+  "Under 18",
+  "18-24",
+  "25-34",
+  "35-44",
+  "45-54",
+  "55-64",
+  "65+",
+] as const;
+
+export const GENDER_OPTIONS = [
+  "Male",
+  "Female",
+  "Other",
+  "Prefer not to answer",
+] as const;
+
 export const users = pgTable("users", {
   id: varchar("id")
     .primaryKey()
@@ -10,6 +27,8 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   displayName: text("display_name").notNull(),
   password: text("password").notNull(),
+  ageRange: text("age_range"),
+  gender: text("gender"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -25,6 +44,7 @@ export const groups = pgTable("groups", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   isPersonal: boolean("is_personal").notNull().default(false),
+  status: text("status").notNull().default("active"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -58,6 +78,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   displayName: true,
   password: true,
+  ageRange: true,
+  gender: true,
 });
 
 export const insertGroupSchema = createInsertSchema(groups).pick({
