@@ -25,7 +25,7 @@ export async function getUserByUsername(username: string): Promise<User | undefi
   return user;
 }
 
-export async function createUser(data: InsertUser): Promise<User> {
+export async function createUser(data: InsertUser & { ageRange?: string; gender?: string }): Promise<User> {
   const [user] = await db.insert(users).values({
     ...data,
     username: data.username.toLowerCase(),
@@ -191,14 +191,25 @@ export async function deleteLogForDate(userId: string, groupId: string, date: st
     ));
 }
 
-export async function getLeaderboard(groupId: string) {
+export async function getLeaderboard(groupId: string, filters?: { ageRange?: string; gender?: string }) {
   const group = await getGroup(groupId);
+
+  const conditions = [eq(groupMembers.groupId, groupId)];
+
+  if (filters?.ageRange && filters.ageRange !== 'All') {
+    conditions.push(eq(users.ageRange, filters.ageRange));
+  }
+  if (filters?.gender && filters.gender !== 'All') {
+    conditions.push(eq(users.gender, filters.gender));
+  }
 
   const results = await db
     .select({
       userId: groupMembers.userId,
       displayName: users.displayName,
       individualGoal: groupMembers.individualGoal,
+      ageRange: users.ageRange,
+      gender: users.gender,
       totalCount: sql<number>`COALESCE(SUM(${dailyLogs.count}), 0)::int`.as("total_count"),
     })
     .from(groupMembers)
@@ -210,8 +221,8 @@ export async function getLeaderboard(groupId: string) {
         eq(dailyLogs.groupId, groupMembers.groupId),
       ),
     )
-    .where(eq(groupMembers.groupId, groupId))
-    .groupBy(groupMembers.userId, users.displayName, groupMembers.individualGoal)
+    .where(and(...conditions))
+    .groupBy(groupMembers.userId, users.displayName, groupMembers.individualGoal, users.ageRange, users.gender)
     .orderBy(desc(sql`total_count`));
 
   return results.map((r, i) => ({
@@ -223,6 +234,8 @@ export async function getLeaderboard(groupId: string) {
     groupGoal: group?.totalGoal || 0,
     exerciseType: group?.exerciseType || "Push-ups",
     goalType: group?.goalType || "group",
+    ageRange: r.ageRange,
+    gender: r.gender,
   }));
 }
 
@@ -234,6 +247,17 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
   await db
     .delete(dailyLogs)
     .where(and(eq(dailyLogs.groupId, groupId), eq(dailyLogs.userId, userId)));
+}
+
+export async function completeChallenge(groupId: string, userId: string): Promise<void> {
+  const group = await getGroup(groupId);
+  if (!group) return;
+  if (group.createdBy !== userId) return;
+
+  await db
+    .update(groups)
+    .set({ status: "completed" })
+    .where(eq(groups.id, groupId));
 }
 
 export async function deleteChallenge(groupId: string, userId: string): Promise<void> {

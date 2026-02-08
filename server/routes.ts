@@ -42,9 +42,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      const { username, displayName, password } = req.body;
+      const { username, displayName, password, ageRange, gender } = req.body;
       if (!username || !displayName || !password) {
         return res.status(400).json({ message: "Username, display name, and password are required" });
+      }
+      if (!ageRange || !gender) {
+        return res.status(400).json({ message: "Age range and gender are required" });
       }
       if (username.length < 3) {
         return res.status(400).json({ message: "Username must be at least 3 characters" });
@@ -56,9 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing) {
         return res.status(409).json({ message: "Username already taken" });
       }
-      const user = await storage.createUser({ username, displayName, password });
+      const user = await storage.createUser({ username, displayName, password, ageRange, gender });
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username, displayName: user.displayName });
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, ageRange: user.ageRange, gender: user.gender });
     } catch (error: any) {
       console.error("Register error:", error);
       res.status(500).json({ message: "Failed to register" });
@@ -76,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid username or password" });
       }
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username, displayName: user.displayName });
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, ageRange: user.ageRange, gender: user.gender });
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Failed to login" });
@@ -93,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.destroy(() => {});
         return res.status(401).json({ message: "User not found" });
       }
-      res.json({ id: user.id, username: user.username, displayName: user.displayName });
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, ageRange: user.ageRange, gender: user.gender });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get user" });
     }
@@ -136,6 +139,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Create personal challenge error:", error);
       res.status(500).json({ message: "Failed to create personal challenge" });
+    }
+  });
+
+  app.post("/api/challenges/:id/complete", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.completeChallenge(req.params.id as string, req.session.userId!);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Complete challenge error:", error);
+      res.status(500).json({ message: "Failed to complete challenge" });
     }
   });
 
@@ -230,7 +243,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/groups/:id/leaderboard", requireAuth, async (req: Request, res: Response) => {
     try {
-      const leaderboard = await storage.getLeaderboard(req.params.id as string);
+      const filters = {
+        ageRange: req.query.ageRange as string | undefined,
+        gender: req.query.gender as string | undefined,
+      };
+      const leaderboard = await storage.getLeaderboard(req.params.id as string, filters);
       res.json(leaderboard);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get leaderboard" });
