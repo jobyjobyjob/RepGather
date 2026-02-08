@@ -89,6 +89,12 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-02-08: Added demographic collection (age range, gender) during user registration with picker modals
+- 2026-02-08: Goal achievement celebration: confetti animation (60 particles) + trophy modal when reaching 100% goal
+- 2026-02-08: Achievement modal offers 3 options: "Complete and save challenge", "Keep Going!", "Delete Challenge"
+- 2026-02-08: Challenge status system: groups have "active"/"completed" status; completed challenges filtered from active list
+- 2026-02-08: POST /api/challenges/:id/complete endpoint for marking challenges complete
+- 2026-02-08: Leaderboard demographic filtering with age range and gender filter chips (group challenges only)
 - 2026-02-07: Added dedicated Leaderboard tab with challenge picker for viewing progress across all challenges
 - 2026-02-07: "Track in Home" button now toggles: dull "Remove from Home" when active, gradient when inactive
 - 2026-02-07: "Finish Day" button shows selected state visually; subsequent taps update the day
