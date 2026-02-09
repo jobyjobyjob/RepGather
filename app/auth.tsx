@@ -77,6 +77,11 @@ export default function AuthScreen() {
       setError('Please fill in all fields');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(username.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
     if (!isLogin && !displayName.trim()) {
       setError('Please enter a display name');
       return;
@@ -136,15 +141,17 @@ export default function AuthScreen() {
 
           <View style={styles.formSection}>
             <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="person-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="Username"
+                placeholder="Email Address"
                 placeholderTextColor={colors.textSecondary}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
                 testID="auth-username"
               />
             </View>

@@ -44,20 +44,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, displayName, password, ageRange, gender } = req.body;
       if (!username || !displayName || !password) {
-        return res.status(400).json({ message: "Username, display name, and password are required" });
+        return res.status(400).json({ message: "Email, display name, and password are required" });
       }
       if (!ageRange || !gender) {
         return res.status(400).json({ message: "Age range and gender are required" });
       }
-      if (username.length < 3) {
-        return res.status(400).json({ message: "Username must be at least 3 characters" });
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(username)) {
+        return res.status(400).json({ message: "Please enter a valid email address" });
       }
       if (password.length < 4) {
         return res.status(400).json({ message: "Password must be at least 4 characters" });
       }
       const existing = await storage.getUserByUsername(username);
       if (existing) {
-        return res.status(409).json({ message: "Username already taken" });
+        return res.status(409).json({ message: "An account with this email already exists" });
       }
       const user = await storage.createUser({ username, displayName, password, ageRange, gender });
       req.session.userId = user.id;
@@ -72,11 +73,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+        return res.status(400).json({ message: "Email and password are required" });
       }
       const user = await storage.getUserByUsername(username);
       if (!user || user.password !== password) {
-        return res.status(401).json({ message: "Invalid username or password" });
+        return res.status(401).json({ message: "Invalid email or password" });
       }
       req.session.userId = user.id;
       res.json({ id: user.id, username: user.username, displayName: user.displayName, ageRange: user.ageRange, gender: user.gender });
