@@ -64,6 +64,7 @@ export default function GroupsScreen() {
   const [groupName, setGroupName] = useState('');
   const [groupGoal, setGroupGoal] = useState('');
   const [exerciseType, setExerciseType] = useState('Push-ups');
+  const [customExercise, setCustomExercise] = useState('');
   const [goalType, setGoalType] = useState<'group' | 'individual'>('group');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -160,9 +161,15 @@ export default function GroupsScreen() {
     },
   });
 
+  const effectiveExerciseType = exerciseType === 'Other' ? (customExercise.trim() || 'Other') : exerciseType;
+
   const handleCreateGroup = () => {
     if (!groupName.trim()) {
       setCreateError('Enter a group name');
+      return;
+    }
+    if (exerciseType === 'Other' && !customExercise.trim()) {
+      setCreateError('Enter a name for your workout type');
       return;
     }
     const goal = parseInt(groupGoal);
@@ -180,7 +187,7 @@ export default function GroupsScreen() {
 
     createGroupMutation.mutate({
       name: groupName.trim(),
-      exerciseType,
+      exerciseType: effectiveExerciseType,
       goalType,
       totalGoal: goalType === 'individual' ? 0 : goal,
       startDate: sd,
@@ -418,6 +425,21 @@ export default function GroupsScreen() {
         </View>
       )}
 
+      {exerciseType === 'Other' && (
+        <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'row', alignItems: 'center' }]}>
+          <Ionicons name="create-outline" size={20} color={colors.tint} style={{ marginRight: 10 }} />
+          <TextInput
+            style={[styles.input, { color: colors.text, flex: 1 }]}
+            value={customExercise}
+            onChangeText={setCustomExercise}
+            placeholder="Enter workout name"
+            placeholderTextColor={colors.textSecondary}
+            maxLength={30}
+            autoFocus
+          />
+        </View>
+      )}
+
       <Text style={[styles.label, { color: colors.textSecondary }]}>GOAL TYPE</Text>
       <View style={styles.goalTypeRow}>
         <TouchableOpacity
@@ -457,7 +479,7 @@ export default function GroupsScreen() {
 
       {goalType === 'group' && (
         <>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL GOAL ({exerciseType.toUpperCase()})</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL GOAL ({effectiveExerciseType.toUpperCase()})</Text>
           <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
               style={[styles.input, { color: colors.text }]}
@@ -484,7 +506,7 @@ export default function GroupsScreen() {
         <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {goalType === 'group' && parseInt(groupGoal) > 0 && (
             <Text style={[styles.summaryTarget, { color: colors.tint }]}>
-              ~{Math.ceil(parseInt(groupGoal) / (differenceInCalendarDays(calEndDate, calStartDate) + 1))} {getExerciseUnit(exerciseType)}/day per member
+              ~{Math.ceil(parseInt(groupGoal) / (differenceInCalendarDays(calEndDate, calStartDate) + 1))} {getExerciseUnit(effectiveExerciseType)}/day per member
             </Text>
           )}
           {goalType === 'individual' && (

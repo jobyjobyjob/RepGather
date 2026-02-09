@@ -27,6 +27,7 @@ export default function SetupScreen() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [exerciseType, setExerciseType] = useState('Push-ups');
+  const [customExercise, setCustomExercise] = useState('');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,13 +65,13 @@ export default function SetupScreen() {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      const name = challengeName.trim() || `${exerciseType} Challenge`;
+      const name = challengeName.trim() || `${effectiveExerciseType} Challenge`;
       const startDateStr = format(startDate, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
 
       const challenge = await createPersonalChallenge({
         name,
-        exerciseType,
+        exerciseType: effectiveExerciseType,
         totalGoal: amount,
         startDate: startDateStr,
         endDate: endDateStr,
@@ -85,11 +86,13 @@ export default function SetupScreen() {
     setIsSubmitting(false);
   };
 
+  const effectiveExerciseType = exerciseType === 'Other' ? (customExercise.trim() || 'Other') : exerciseType;
+
   const dailyAverage = goalAmount && totalDays > 0
     ? Math.ceil(parseInt(goalAmount, 10) / totalDays)
     : 0;
 
-  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && startDate && endDate && totalDays >= 1 && !isSubmitting;
+  const isValid = goalAmount && parseInt(goalAmount, 10) > 0 && startDate && endDate && totalDays >= 1 && !isSubmitting && (exerciseType !== 'Other' || customExercise.trim().length > 0);
 
   return (
     <KeyboardAvoidingView
@@ -128,7 +131,7 @@ export default function SetupScreen() {
               style={[styles.nameInput, { color: colors.text, fontFamily: 'Inter_500Medium' }]}
               value={challengeName}
               onChangeText={setChallengeName}
-              placeholder={`e.g., ${exerciseType} Challenge`}
+              placeholder={`e.g., ${effectiveExerciseType} Challenge`}
               placeholderTextColor={colors.textSecondary}
               maxLength={40}
             />
@@ -169,6 +172,20 @@ export default function SetupScreen() {
               </ScrollView>
             </View>
           )}
+          {exerciseType === 'Other' && (
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="create-outline" size={20} color={colors.tint} style={{ marginRight: 10 }} />
+              <TextInput
+                style={[styles.nameInput, { color: colors.text, fontFamily: 'Inter_500Medium', flex: 1 }]}
+                value={customExercise}
+                onChangeText={setCustomExercise}
+                placeholder="Enter workout name"
+                placeholderTextColor={colors.textSecondary}
+                maxLength={30}
+                autoFocus
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -186,7 +203,7 @@ export default function SetupScreen() {
               maxLength={7}
             />
             <Text style={[styles.inputSuffix, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-              {exerciseType.toLowerCase()}
+              {effectiveExerciseType.toLowerCase()}
             </Text>
           </View>
           <View style={styles.presetRow}>
@@ -228,7 +245,7 @@ export default function SetupScreen() {
             <View style={styles.summaryRow}>
               <Ionicons name="calculator" size={20} color={colors.tint} />
               <Text style={[styles.summaryText, { color: colors.text, fontFamily: 'Inter_500Medium' }]}>
-                About {dailyAverage} {exerciseType.toLowerCase()} per day
+                About {dailyAverage} {effectiveExerciseType.toLowerCase()} per day
               </Text>
             </View>
             <Text style={[styles.summarySubtext, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
