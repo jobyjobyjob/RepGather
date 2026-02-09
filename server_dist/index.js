@@ -318,6 +318,7 @@ function requireAuth(req, res, next) {
 }
 async function registerRoutes(app2) {
   const PgStore = connectPgSimple(session);
+  const isProduction = process.env.NODE_ENV === "production";
   app2.use(
     session({
       store: new PgStore({
@@ -328,10 +329,10 @@ async function registerRoutes(app2) {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: isProduction,
         httpOnly: true,
         maxAge: 30 * 24 * 60 * 60 * 1e3,
-        sameSite: "lax"
+        sameSite: isProduction ? "none" : "lax"
       }
     })
   );
@@ -769,6 +770,7 @@ function setupErrorHandler(app2) {
   });
 }
 (async () => {
+  app.set("trust proxy", 1);
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
