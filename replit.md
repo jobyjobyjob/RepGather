@@ -74,8 +74,10 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Database
-- PostgreSQL via Drizzle ORM (active, used for auth, challenges, groups, and logs)
+- External PostgreSQL via Neon (neon.tech), connected via EXTERNAL_DATABASE_URL secret
+- Drizzle ORM for database operations (auth, challenges, groups, and logs)
 - Schema defined in `shared/schema.ts`
+- server/db.ts prioritizes EXTERNAL_DATABASE_URL over DATABASE_URL
 
 ### Third-Party Services
 - **Expo Notifications**: Push notification support for reminders
@@ -89,6 +91,10 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-02-09: Migrated database to external Neon PostgreSQL (user-owned account); EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
+- 2026-02-09: Swipe-left-to-delete gesture for challenges in Settings tab using PanResponder
+- 2026-02-09: Home screen counter reworked: +/- buttons with local state, save button (orange=unsaved, green=saved)
+- 2026-02-09: Fixed group deletion/leave not refreshing challenge list on home page
 - 2026-02-08: Added demographic collection (age range, gender) during user registration with picker modals
 - 2026-02-08: Goal achievement celebration: confetti animation (60 particles) + trophy modal when reaching 100% goal
 - 2026-02-08: Achievement modal offers 3 options: "Complete and save challenge", "Keep Going!", "Delete Challenge"
