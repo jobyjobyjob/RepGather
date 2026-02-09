@@ -300,6 +300,17 @@ async function completeChallenge(groupId, userId) {
   if (group.createdBy !== userId) return;
   await db.update(groups).set({ status: "completed" }).where(eq(groups.id, groupId));
 }
+async function deleteUser(userId) {
+  const userGroups = await db.select({ id: groups.id }).from(groups).where(eq(groups.createdBy, userId));
+  for (const group of userGroups) {
+    await db.delete(dailyLogs).where(eq(dailyLogs.groupId, group.id));
+    await db.delete(groupMembers).where(eq(groupMembers.groupId, group.id));
+    await db.delete(groups).where(eq(groups.id, group.id));
+  }
+  await db.delete(dailyLogs).where(eq(dailyLogs.userId, userId));
+  await db.delete(groupMembers).where(eq(groupMembers.userId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+}
 async function deleteChallenge(groupId, userId) {
   const group = await getGroup(groupId);
   if (!group) return;
@@ -401,6 +412,18 @@ async function registerRoutes(app2) {
     req.session.destroy(() => {
       res.json({ success: true });
     });
+  });
+  app2.delete("/api/auth/account", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      await deleteUser(userId);
+      req.session.destroy(() => {
+        res.json({ success: true });
+      });
+    } catch (error) {
+      console.error("Delete account error:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
   });
   app2.get("/api/challenges", requireAuth, async (req, res) => {
     try {
