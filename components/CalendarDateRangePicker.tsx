@@ -44,7 +44,6 @@ export default function CalendarDateRangePicker({
   const [selectingEnd, setSelectingEnd] = useState(false);
 
   const today = startOfDay(new Date());
-  const effectiveMinDate = minDate ? startOfDay(minDate) : today;
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -65,8 +64,6 @@ export default function CalendarDateRangePicker({
   };
 
   const handleDayPress = (day: Date) => {
-    if (isBefore(day, effectiveMinDate)) return;
-
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -92,7 +89,7 @@ export default function CalendarDateRangePicker({
   const isRangeStart = (day: Date) => startDate && isSameDay(day, startDate);
   const isRangeEnd = (day: Date) => endDate && isSameDay(day, endDate);
 
-  const canGoPrev = isAfter(startOfMonth(currentMonth), effectiveMinDate);
+  const canGoPrev = true;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -125,7 +122,7 @@ export default function CalendarDateRangePicker({
       <View style={styles.daysGrid}>
         {calendarDays.map((day, index) => {
           const inCurrentMonth = isSameMonth(day, currentMonth);
-          const disabled = isBefore(day, effectiveMinDate);
+          const disabled = false;
           const isStart = isRangeStart(day);
           const isEnd = isRangeEnd(day);
           const inRange = isInRange(day);
