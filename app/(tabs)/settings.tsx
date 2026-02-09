@@ -85,7 +85,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
 
   const { isLoading, challenges, activeChallenge, deleteChallenge } = usePushups();
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const requestNotificationPermission = async () => {
@@ -279,6 +279,56 @@ export default function SettingsScreen() {
               </View>
               <Text style={[styles.actionLabel, { color: colors.error, fontFamily: 'Inter_600SemiBold' }]}>
                 Sign Out
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                Alert.alert(
+                  'Delete Account',
+                  'This will permanently delete your account, all your challenges, and all your progress. This cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete My Account',
+                      style: 'destructive',
+                      onPress: () => {
+                        Alert.alert(
+                          'Are you absolutely sure?',
+                          'All data will be permanently removed.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Yes, Delete Everything',
+                              style: 'destructive',
+                              onPress: async () => {
+                                try {
+                                  await deleteAccount();
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                } catch {
+                                  Alert.alert('Error', 'Failed to delete account. Please try again.');
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      },
+                    },
+                  ]
+                );
+              }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                { backgroundColor: colors.card },
+                pressed && { opacity: 0.8 },
+              ]}
+              testID="delete-account-btn"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: colors.error + '20' }]}>
+                <Ionicons name="person-remove" size={22} color={colors.error} />
+              </View>
+              <Text style={[styles.actionLabel, { color: colors.error, fontFamily: 'Inter_600SemiBold' }]}>
+                Delete Account
               </Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </Pressable>

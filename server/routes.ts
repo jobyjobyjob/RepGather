@@ -111,6 +111,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.delete("/api/auth/account", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      await storage.deleteUser(userId);
+      req.session.destroy(() => {
+        res.json({ success: true });
+      });
+    } catch (error: any) {
+      console.error("Delete account error:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
   // Challenges endpoint - returns all challenges (personal + group) for user
   app.get("/api/challenges", requireAuth, async (req: Request, res: Response) => {
     try {

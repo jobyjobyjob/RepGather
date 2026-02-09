@@ -260,6 +260,23 @@ export async function completeChallenge(groupId: string, userId: string): Promis
     .where(eq(groups.id, groupId));
 }
 
+export async function deleteUser(userId: string): Promise<void> {
+  const userGroups = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.createdBy, userId));
+
+  for (const group of userGroups) {
+    await db.delete(dailyLogs).where(eq(dailyLogs.groupId, group.id));
+    await db.delete(groupMembers).where(eq(groupMembers.groupId, group.id));
+    await db.delete(groups).where(eq(groups.id, group.id));
+  }
+
+  await db.delete(dailyLogs).where(eq(dailyLogs.userId, userId));
+  await db.delete(groupMembers).where(eq(groupMembers.userId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+}
+
 export async function deleteChallenge(groupId: string, userId: string): Promise<void> {
   const group = await getGroup(groupId);
   if (!group) return;
