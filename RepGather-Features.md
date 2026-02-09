@@ -25,20 +25,23 @@ RepGather supports 12 exercise types:
 | Cycling | miles |
 | Jump Rope | reps |
 | Jumping Jacks | reps |
-| Other | reps |
+| Other (Custom) | reps (default) |
+
+**Custom Exercise Types**: When you select "Other," a text input appears where you can type any workout name (up to 30 characters). Your custom name is then used throughout the app wherever the exercise type is displayed -- in challenge pickers, progress labels, leaderboard, and history.
 
 ---
 
 ## User Accounts & Registration
 
 ### Sign Up
-- Create an account with a username, display name, and password
+- Create an account with an **email address**, display name, and password
+- Email format is validated (must be a valid email like name@example.com)
 - During registration, you'll select your age range and gender (used for leaderboard filtering)
 - Age range options: Under 18, 18-24, 25-34, 35-44, 45-54, 55-64, 65+
 - Gender options: Male, Female, Other, Prefer not to answer
 
 ### Sign In / Sign Out
-- Log in with your username and password
+- Log in with your email address and password
 - Session-based authentication keeps you logged in
 - Log out anytime from the Settings tab
 
@@ -50,8 +53,8 @@ Challenges are the core of RepGather. There are two types:
 
 ### Personal Challenges
 - Created just for you -- no one else can see or join them
-- Set your own exercise type, goal, and time period
-- Example: "Do 1,000 push-ups in February"
+- Set your own exercise type (including custom workout names), goal, and time period
+- Example: "Do 1,000 push-ups in February" or "Do 500 Yoga sessions in March"
 
 ### Group Challenges
 - Created for teams -- anyone with the invite code can join
@@ -112,7 +115,7 @@ Manage your group challenges.
 - **Group List**: Shows all collaborative (non-personal) groups you belong to
 - **Create Group**: Set up a new group challenge with:
   - Group name
-  - Exercise type
+  - Exercise type (including custom workout names via "Other")
   - Goal type (group total vs. individual)
   - Total or individual goal amount
   - Start and end dates
@@ -129,7 +132,7 @@ Manage your account and challenges.
 - **All Challenges**: Lists all your challenges (personal and group)
   - **Swipe left to delete**: Slide any challenge left to reveal a delete button
 - **Notifications**: Toggle push notification reminders on/off
-- **Account Info**: View your username and display name
+- **Account Info**: View your email address and display name
 - **Logout**: Sign out of your account
 
 ---
@@ -161,7 +164,7 @@ When you reach 100% of your challenge goal:
 ### Data Models
 
 **Users**
-- Username, display name, password (hashed)
+- Email address (used as username), display name, password (hashed)
 - Age range and gender (for leaderboard filtering)
 
 **Challenges/Groups**
