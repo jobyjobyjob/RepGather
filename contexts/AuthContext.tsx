@@ -16,6 +16,7 @@ interface AuthContextValue {
   register: (username: string, displayName: string, password: string, ageRange: string, gender: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  updateProfile: (data: { displayName?: string; ageRange?: string; gender?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -62,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateProfile = useCallback(async (data: { displayName?: string; ageRange?: string; gender?: string }) => {
+    const res = await apiRequest("PUT", "/api/auth/profile", data);
+    const updated = await res.json();
+    setUser(updated);
+  }, []);
+
   const value = useMemo(() => ({
     user,
     isLoading,
@@ -69,7 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     logout,
     deleteAccount,
-  }), [user, isLoading, login, register, logout, deleteAccount]);
+    updateProfile,
+  }), [user, isLoading, login, register, logout, deleteAccount, updateProfile]);
 
   return (
     <AuthContext.Provider value={value}>
