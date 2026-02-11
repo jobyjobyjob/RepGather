@@ -95,7 +95,7 @@ export default function GroupsScreen() {
       const res = await apiRequest("POST", "/api/groups", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (group: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
       setViewMode('list');
       setGroupName('');
@@ -103,6 +103,10 @@ export default function GroupsScreen() {
       setExerciseType('Push-ups');
       setGoalType('group');
       setCreateError('');
+      await refresh();
+      if (group?.id) {
+        await setActiveGroupCtx(group.id);
+      }
     },
     onError: (err: any) => {
       setCreateError(err.message || 'Failed to create group');
@@ -114,11 +118,15 @@ export default function GroupsScreen() {
       const res = await apiRequest("POST", "/api/groups/join", { inviteCode: code });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (group: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
       setViewMode('list');
       setInviteCode('');
       setJoinError('');
+      await refresh();
+      if (group?.id) {
+        await setActiveGroupCtx(group.id);
+      }
     },
     onError: (err: any) => {
       const msg = err.message || 'Failed to join group';
@@ -756,40 +764,6 @@ export default function GroupsScreen() {
             </View>
           </View>
         )}
-
-        <TouchableOpacity
-          style={[
-            styles.trackButton,
-            activeChallengeId === selectedGroup.id && { opacity: 1 },
-          ]}
-          onPress={() => {
-            if (activeChallengeId === selectedGroup.id) {
-              setActiveGroupCtx(null);
-            } else {
-              setActiveGroupCtx(selectedGroup.id);
-            }
-          }}
-          testID="track-group-btn"
-        >
-          {activeChallengeId === selectedGroup.id ? (
-            <View style={[styles.primaryButtonGradient, {
-              backgroundColor: colors.border,
-            }]}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-              <Text style={[styles.primaryButtonText, { color: colors.textSecondary }]}>Remove from Home</Text>
-            </View>
-          ) : (
-            <LinearGradient
-              colors={['#FF6B35', '#FF9F1C']}
-              style={styles.primaryButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Ionicons name="flame" size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>Track in Home</Text>
-            </LinearGradient>
-          )}
-        </TouchableOpacity>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Leaderboard</Text>
 
