@@ -81,12 +81,16 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
   const todayLog = logs.find(log => log.date === todayStr);
   const todayCount = todayLog?.count || 0;
 
-  const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  const logsByDate = new Map(logs.map(l => [l.date, l]));
   let streak = 0;
   let checkDate = new Date();
+  const todayForStreak = format(checkDate, 'yyyy-MM-dd');
+  if (!logsByDate.has(todayForStreak) || (logsByDate.get(todayForStreak)?.count ?? 0) === 0) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
   for (let i = 0; i < 366; i++) {
     const expectedDate = format(checkDate, 'yyyy-MM-dd');
-    const log = sortedLogs.find(l => l.date === expectedDate);
+    const log = logsByDate.get(expectedDate);
     if (log && log.count > 0) {
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);

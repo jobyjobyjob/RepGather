@@ -91,6 +91,7 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-02-11: Fixed streak counter: now starts from yesterday if today has no entry; useFocusEffect on Home/History tabs ensures logs refresh after edits
 - 2026-02-09: Migrated database to external Neon PostgreSQL (user-owned account); EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
 - 2026-02-09: Swipe-left-to-delete gesture for challenges in Settings tab using PanResponder
 - 2026-02-09: Home screen counter reworked: +/- buttons with local state, save button (orange=unsaved, green=saved)

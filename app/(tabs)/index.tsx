@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withDelay, Easing } from 'react-native-reanimated';
@@ -188,9 +188,15 @@ export default function TodayScreen() {
   const {
     isLoading, challenges, activeChallengeId, activeChallenge,
     logs, progress, logActivity, updateLog, setActiveChallenge,
-    deleteChallenge, completeChallenge,
+    deleteChallenge, completeChallenge, refresh,
   } = usePushups();
   const { user } = useAuth();
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [goalCelebrated, setGoalCelebrated] = useState(false);

@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, useColorScheme, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -178,7 +178,13 @@ export default function HistoryScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge } = usePushups();
+  const { isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, refresh } = usePushups();
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
