@@ -33,6 +33,16 @@ export async function createUser(data: InsertUser & { ageRange?: string; gender?
   return user;
 }
 
+export async function updateUserProfile(id: string, data: { displayName?: string; ageRange?: string; gender?: string }): Promise<User | undefined> {
+  const updateData: Record<string, string> = {};
+  if (data.displayName !== undefined) updateData.displayName = data.displayName;
+  if (data.ageRange !== undefined) updateData.ageRange = data.ageRange;
+  if (data.gender !== undefined) updateData.gender = data.gender;
+  if (Object.keys(updateData).length === 0) return getUser(id);
+  const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+  return user;
+}
+
 export async function createGroup(data: {
   name: string;
   exerciseType?: string;

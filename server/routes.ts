@@ -105,6 +105,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/auth/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { displayName, ageRange, gender } = req.body;
+      const user = await storage.updateUserProfile(req.session.userId!, { displayName, ageRange, gender });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, ageRange: user.ageRange, gender: user.gender });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.session.destroy(() => {
       res.json({ success: true });
