@@ -19,28 +19,45 @@ function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate 
   onActivate: (id: string) => void;
 }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
+  const isOpen = useRef(false);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
       },
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0) {
-          translateX.setValue(Math.max(gestureState.dx, -100));
-        }
+        const base = isOpen.current ? -80 : 0;
+        const newX = base + gestureState.dx;
+        translateX.setValue(Math.max(Math.min(newX, 0), -100));
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -60) {
-          RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true }).start();
+        if (isOpen.current) {
+          if (gestureState.dx > 30) {
+            isOpen.current = false;
+            RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+          } else {
+            RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true, bounciness: 0 }).start();
+          }
         } else {
-          RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          if (gestureState.dx < -50) {
+            isOpen.current = true;
+            RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true, bounciness: 0 }).start();
+          } else {
+            isOpen.current = false;
+            RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+          }
         }
+      },
+      onPanResponderTerminate: () => {
+        isOpen.current = false;
+        RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
       },
     })
   ).current;
 
   const resetSwipe = () => {
-    RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+    isOpen.current = false;
+    RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
   };
 
   return (
