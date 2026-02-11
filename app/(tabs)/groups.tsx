@@ -260,9 +260,75 @@ export default function GroupsScreen() {
     return type.toLowerCase();
   };
 
+  const renderGroupCard = (group: GroupData) => {
+    const totalDays = differenceInDays(parseISO(group.endDate), parseISO(group.startDate)) + 1;
+    const isActive = activeChallengeId === group.id;
+    const isOwner = group.createdBy === user?.id;
+    const goalDisplay = group.goalType === 'individual'
+      ? (group.myIndividualGoal ? `${group.myIndividualGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}` : 'Set your goal')
+      : `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}`;
+    return (
+      <TouchableOpacity
+        key={group.id}
+        style={[styles.groupCard, {
+          backgroundColor: colors.card,
+          borderColor: isActive ? colors.tint : colors.border,
+          borderWidth: isActive ? 2 : 1,
+        }]}
+        onPress={() => openGroup(group)}
+        testID={`group-card-${group.id}`}
+      >
+        <View style={styles.groupCardHeader}>
+          <View style={[styles.groupIcon, { backgroundColor: isActive ? colors.tint + '30' : colors.tint + '20' }]}>
+            <Ionicons name={isActive ? "flame" : "people"} size={24} color={colors.tint} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                {group.name}
+              </Text>
+              <View style={[styles.roleBadge, { backgroundColor: isOwner ? '#FF9F1C20' : colors.success + '20' }]}>
+                <Text style={[styles.roleBadgeText, { color: isOwner ? '#FF9F1C' : colors.success }]}>
+                  {isOwner ? 'Owner' : 'Member'}
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.groupMeta, { color: colors.textSecondary }]}>
+              {goalDisplay} in {totalDays} days
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </View>
+        <View style={[styles.groupCardFooter, { borderTopColor: colors.border }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.groupDateRange, { color: colors.textSecondary }]}>
+              {format(parseISO(group.startDate), 'MMM d')} - {format(parseISO(group.endDate), 'MMM d, yyyy')}
+            </Text>
+            <View style={[styles.exerciseBadge, { backgroundColor: colors.tint + '15' }]}>
+              <Text style={[styles.exerciseBadgeText, { color: colors.tint }]}>{group.exerciseType}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.codeBadge, { backgroundColor: colors.tint + '15', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Clipboard.setStringAsync(group.inviteCode);
+              Alert.alert('Copied', 'Invite code copied to clipboard');
+            }}
+          >
+            <Text style={[styles.codeText, { color: colors.tint }]}>{group.inviteCode}</Text>
+            <Ionicons name="copy-outline" size={14} color={colors.tint} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderGroupList = () => {
     const allGroups = groupsQuery.data || [];
     const groups = allGroups.filter(g => !g.isPersonal);
+    const ownedGroups = groups.filter(g => g.createdBy === user?.id);
+    const joinedGroups = groups.filter(g => g.createdBy !== user?.id);
 
     return (
       <ScrollView
@@ -307,61 +373,24 @@ export default function GroupsScreen() {
             </Text>
           </View>
         ) : (
-          groups.map((group) => {
-            const totalDays = differenceInDays(parseISO(group.endDate), parseISO(group.startDate)) + 1;
-            const isActive = activeChallengeId === group.id;
-            const goalDisplay = group.goalType === 'individual'
-              ? (group.myIndividualGoal ? `${group.myIndividualGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}` : 'Set your goal')
-              : `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}`;
-            return (
-              <TouchableOpacity
-                key={group.id}
-                style={[styles.groupCard, {
-                  backgroundColor: colors.card,
-                  borderColor: isActive ? colors.tint : colors.border,
-                  borderWidth: isActive ? 2 : 1,
-                }]}
-                onPress={() => openGroup(group)}
-                testID={`group-card-${group.id}`}
-              >
-                <View style={styles.groupCardHeader}>
-                  <View style={[styles.groupIcon, { backgroundColor: isActive ? colors.tint + '30' : colors.tint + '20' }]}>
-                    <Ionicons name={isActive ? "flame" : "people"} size={24} color={colors.tint} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.groupName, { color: colors.text }]}>
-                      {group.name}{isActive ? ' (Active)' : ''}
-                    </Text>
-                    <Text style={[styles.groupMeta, { color: colors.textSecondary }]}>
-                      {goalDisplay} in {totalDays} days
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                </View>
-                <View style={[styles.groupCardFooter, { borderTopColor: colors.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.groupDateRange, { color: colors.textSecondary }]}>
-                      {format(parseISO(group.startDate), 'MMM d')} - {format(parseISO(group.endDate), 'MMM d, yyyy')}
-                    </Text>
-                    <View style={[styles.exerciseBadge, { backgroundColor: colors.tint + '15' }]}>
-                      <Text style={[styles.exerciseBadgeText, { color: colors.tint }]}>{group.exerciseType}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.codeBadge, { backgroundColor: colors.tint + '15', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      Clipboard.setStringAsync(group.inviteCode);
-                      Alert.alert('Copied', 'Invite code copied to clipboard');
-                    }}
-                  >
-                    <Text style={[styles.codeText, { color: colors.tint }]}>{group.inviteCode}</Text>
-                    <Ionicons name="copy-outline" size={14} color={colors.tint} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })
+          <>
+            {ownedGroups.length > 0 && (
+              <View style={{ gap: 8 }}>
+                <Text style={[styles.groupSectionLabel, { color: colors.textSecondary }]}>
+                  CREATED BY YOU ({ownedGroups.length})
+                </Text>
+                {ownedGroups.map(renderGroupCard)}
+              </View>
+            )}
+            {joinedGroups.length > 0 && (
+              <View style={{ gap: 8, marginTop: ownedGroups.length > 0 ? 16 : 0 }}>
+                <Text style={[styles.groupSectionLabel, { color: colors.textSecondary }]}>
+                  JOINED ({joinedGroups.length})
+                </Text>
+                {joinedGroups.map(renderGroupCard)}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     );
@@ -640,9 +669,16 @@ export default function GroupsScreen() {
           <TouchableOpacity onPress={() => { setViewMode('list'); setSelectedGroup(null); }} testID="back-to-list-detail">
             <Ionicons name="arrow-back" size={24} color={colors.tint} />
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: colors.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
-            {selectedGroup.name}
-          </Text>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={[styles.screenTitle, { color: colors.text, marginBottom: 0 }]} numberOfLines={1}>
+              {selectedGroup.name}
+            </Text>
+            <View style={[styles.roleBadge, { backgroundColor: isCreator ? '#FF9F1C20' : colors.success + '20', marginTop: 4 }]}>
+              <Text style={[styles.roleBadgeText, { color: isCreator ? '#FF9F1C' : colors.success }]}>
+                {isCreator ? 'Owner' : 'Member'}
+              </Text>
+            </View>
+          </View>
           <View style={{ width: 24 }} />
         </View>
 
@@ -867,7 +903,10 @@ const styles = StyleSheet.create({
   groupCard: { borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   groupCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   groupIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  groupName: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  groupSectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', letterSpacing: 1, marginLeft: 4 },
+  roleBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 },
+  roleBadgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  groupName: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
   groupMeta: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   groupCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1 },
   groupDateRange: { fontSize: 12, fontFamily: 'Inter_400Regular' },
