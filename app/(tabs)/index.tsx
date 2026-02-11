@@ -210,8 +210,25 @@ export default function TodayScreen() {
     setSavedCount(serverTodayCount);
   }, [serverTodayCount]);
 
+  const challengeSwitchRef = useRef(false);
+
+  useEffect(() => {
+    challengeSwitchRef.current = true;
+    setGoalCelebrated(false);
+    prevPercentRef.current = 0;
+    setLocalCount(null);
+    setSavedCount(null);
+  }, [activeChallengeId]);
+
   useEffect(() => {
     const currentPercent = progress?.percentComplete || 0;
+
+    if (challengeSwitchRef.current) {
+      prevPercentRef.current = currentPercent;
+      challengeSwitchRef.current = false;
+      return;
+    }
+
     const prevPercent = prevPercentRef.current;
 
     if (currentPercent >= 100 && prevPercent < 100 && !goalCelebrated && activeChallenge) {
@@ -223,13 +240,6 @@ export default function TodayScreen() {
 
     prevPercentRef.current = currentPercent;
   }, [progress?.percentComplete, goalCelebrated, activeChallenge]);
-
-  useEffect(() => {
-    setGoalCelebrated(false);
-    prevPercentRef.current = 0;
-    setLocalCount(null);
-    setSavedCount(null);
-  }, [activeChallengeId]);
 
   const currentCount = localCount ?? serverTodayCount;
   const hasUnsavedChanges = localCount !== null && localCount !== savedCount;
