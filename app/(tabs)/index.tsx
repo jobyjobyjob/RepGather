@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
 import { ConfettiCelebration } from '@/components/ConfettiCelebration';
+import DailyBarChart from '@/components/DailyBarChart';
 
 function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   challenges: Challenge[];
@@ -614,6 +615,16 @@ export default function TodayScreen() {
             </Text>
           </View>
         </View>
+
+        {activeChallenge && (
+          <DailyBarChart
+            logs={logs}
+            startDate={activeChallenge.startDate}
+            endDate={activeChallenge.endDate}
+            colors={colors}
+            exerciseLabel={exerciseLabel}
+          />
+        )}
 
       </ScrollView>
 

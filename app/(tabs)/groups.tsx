@@ -1,8 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList,
   ActivityIndicator, useColorScheme, Platform, Alert, ScrollView, RefreshControl,
+  PanResponder, Animated as RNAnimated,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,6 +77,13 @@ export default function GroupsScreen() {
 
   const [calStartDate, setCalStartDate] = useState<Date | null>(null);
   const [calEndDate, setCalEndDate] = useState<Date | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+      refresh();
+    }, [refresh])
+  );
 
   const groupsQuery = useQuery<GroupData[]>({
     queryKey: ['/api/groups'],
