@@ -19,69 +19,73 @@ function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate 
   onActivate: (id: string) => void;
 }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
+  const deleteOpacity = useRef(new RNAnimated.Value(0)).current;
   const isOpen = useRef(false);
-  const [showDelete, setShowDelete] = useState(false);
+
+  const closeRow = () => {
+    isOpen.current = false;
+    RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    RNAnimated.timing(deleteOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+  };
+
+  const openRow = () => {
+    isOpen.current = true;
+    RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
+    RNAnimated.timing(deleteOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
       },
-      onPanResponderGrant: () => {
-        setShowDelete(true);
-      },
       onPanResponderMove: (_, gestureState) => {
         const base = isOpen.current ? -80 : 0;
         const newX = base + gestureState.dx;
-        translateX.setValue(Math.max(Math.min(newX, 0), -100));
+        const clamped = Math.max(Math.min(newX, 0), -100);
+        translateX.setValue(clamped);
+        deleteOpacity.setValue(Math.min(1, Math.abs(clamped) / 40));
       },
       onPanResponderRelease: (_, gestureState) => {
         if (isOpen.current) {
           if (gestureState.dx > 30) {
-            isOpen.current = false;
-            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-              setShowDelete(false);
-            });
+            closeRow();
           } else {
-            RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
+            openRow();
           }
         } else {
           if (gestureState.dx < -50) {
-            isOpen.current = true;
-            RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
+            openRow();
           } else {
-            isOpen.current = false;
-            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-              setShowDelete(false);
-            });
+            closeRow();
           }
         }
       },
       onPanResponderTerminate: () => {
-        isOpen.current = false;
-        RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          setShowDelete(false);
-        });
+        closeRow();
       },
     })
   ).current;
 
   return (
-    <View style={[styles.swipeContainer, { borderRadius: 14 }]}>
-      {showDelete && (
+    <View style={[styles.swipeContainer, { borderRadius: 14, overflow: 'hidden' }]}>
+      <RNAnimated.View
+        style={[
+          styles.deleteBackground,
+          { backgroundColor: colors.error, opacity: deleteOpacity },
+        ]}
+        pointerEvents={isOpen.current ? 'auto' : 'none'}
+      >
         <Pressable
           onPress={() => {
-            isOpen.current = false;
-            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-              setShowDelete(false);
-            });
+            closeRow();
             onDelete(challenge.id, challenge.name);
           }}
-          style={[styles.deleteBackground, { backgroundColor: colors.error }]}
+          style={styles.deleteBackgroundInner}
         >
           <Ionicons name="trash" size={22} color="#FFFFFF" />
         </Pressable>
-      )}
+      </RNAnimated.View>
       <RNAnimated.View
         {...panResponder.panHandlers}
         style={[
@@ -96,7 +100,13 @@ function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate 
       >
         <Pressable
           style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-          onPress={() => onActivate(challenge.id)}
+          onPress={() => {
+            if (isOpen.current) {
+              closeRow();
+            } else {
+              onActivate(challenge.id);
+            }
+          }}
         >
           <View style={[styles.challengeIcon, { backgroundColor: isActive ? colors.tint + '25' : colors.progressBackground }]}>
             <Ionicons
@@ -659,10 +669,14 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
+  },
+  deleteBackgroundInner: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   swipeHint: { fontSize: 11, textAlign: 'center', marginTop: 2 },
   footer: { alignItems: 'center', paddingVertical: 20 },
