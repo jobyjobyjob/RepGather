@@ -20,10 +20,15 @@ function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate 
 }) {
   const translateX = useRef(new RNAnimated.Value(0)).current;
   const isOpen = useRef(false);
+  const [showDelete, setShowDelete] = useState(false);
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderGrant: () => {
+        setShowDelete(true);
       },
       onPanResponderMove: (_, gestureState) => {
         const base = isOpen.current ? -80 : 0;
@@ -34,43 +39,49 @@ function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate 
         if (isOpen.current) {
           if (gestureState.dx > 30) {
             isOpen.current = false;
-            RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+              setShowDelete(false);
+            });
           } else {
-            RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true, bounciness: 0 }).start();
+            RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
           }
         } else {
           if (gestureState.dx < -50) {
             isOpen.current = true;
-            RNAnimated.spring(translateX, { toValue: -80, useNativeDriver: true, bounciness: 0 }).start();
+            RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
           } else {
             isOpen.current = false;
-            RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+              setShowDelete(false);
+            });
           }
         }
       },
       onPanResponderTerminate: () => {
         isOpen.current = false;
-        RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+        RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setShowDelete(false);
+        });
       },
     })
   ).current;
 
-  const resetSwipe = () => {
-    isOpen.current = false;
-    RNAnimated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
-  };
-
   return (
-    <View style={[styles.swipeContainer, { overflow: 'hidden', borderRadius: 14 }]}>
-      <Pressable
-        onPress={() => {
-          resetSwipe();
-          onDelete(challenge.id, challenge.name);
-        }}
-        style={[styles.deleteBackground, { backgroundColor: colors.error }]}
-      >
-        <Ionicons name="trash" size={22} color="#FFFFFF" />
-      </Pressable>
+    <View style={[styles.swipeContainer, { borderRadius: 14 }]}>
+      {showDelete && (
+        <Pressable
+          onPress={() => {
+            isOpen.current = false;
+            RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+              setShowDelete(false);
+            });
+            onDelete(challenge.id, challenge.name);
+          }}
+          style={[styles.deleteBackground, { backgroundColor: colors.error }]}
+        >
+          <Ionicons name="trash" size={22} color="#FFFFFF" />
+        </Pressable>
+      )}
       <RNAnimated.View
         {...panResponder.panHandlers}
         style={[
