@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator, PanResponder, Animated as RNAnimated, TextInput, Modal, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator, TextInput, Modal, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,127 +11,58 @@ import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { AGE_RANGES, GENDER_OPTIONS } from '@shared/schema';
 
-function SwipeableChallenge({ challenge, onDelete, colors, isActive, onActivate }: {
+function ChallengeRow({ challenge, onDelete, colors, isActive, onActivate }: {
   challenge: Challenge;
   onDelete: (id: string, name: string) => void;
   colors: any;
   isActive: boolean;
   onActivate: (id: string) => void;
 }) {
-  const translateX = useRef(new RNAnimated.Value(0)).current;
-  const deleteOpacity = useRef(new RNAnimated.Value(0)).current;
-  const isOpen = useRef(false);
-
-  const closeRow = () => {
-    isOpen.current = false;
-    RNAnimated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    RNAnimated.timing(deleteOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
-  };
-
-  const openRow = () => {
-    isOpen.current = true;
-    RNAnimated.timing(translateX, { toValue: -80, duration: 200, useNativeDriver: true }).start();
-    RNAnimated.timing(deleteOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const base = isOpen.current ? -80 : 0;
-        const newX = base + gestureState.dx;
-        const clamped = Math.max(Math.min(newX, 0), -100);
-        translateX.setValue(clamped);
-        deleteOpacity.setValue(Math.min(1, Math.abs(clamped) / 40));
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (isOpen.current) {
-          if (gestureState.dx > 30) {
-            closeRow();
-          } else {
-            openRow();
-          }
-        } else {
-          if (gestureState.dx < -50) {
-            openRow();
-          } else {
-            closeRow();
-          }
-        }
-      },
-      onPanResponderTerminate: () => {
-        closeRow();
-      },
-    })
-  ).current;
-
   return (
-    <View style={[styles.swipeContainer, { borderRadius: 14, overflow: 'hidden' }]}>
-      <RNAnimated.View
-        style={[
-          styles.deleteBackground,
-          { backgroundColor: colors.error, opacity: deleteOpacity },
-        ]}
-        pointerEvents={isOpen.current ? 'auto' : 'none'}
+    <View style={[
+      styles.challengeRow,
+      {
+        backgroundColor: isActive ? colors.tint + '10' : colors.card,
+        borderColor: isActive ? colors.tint + '30' : 'transparent',
+        borderWidth: isActive ? 1 : 0,
+      },
+    ]}>
+      <Pressable
+        style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+        onPress={() => onActivate(challenge.id)}
       >
-        <Pressable
-          onPress={() => {
-            closeRow();
-            onDelete(challenge.id, challenge.name);
-          }}
-          style={styles.deleteBackgroundInner}
-        >
-          <Ionicons name="trash" size={22} color="#FFFFFF" />
-        </Pressable>
-      </RNAnimated.View>
-      <RNAnimated.View
-        {...panResponder.panHandlers}
-        style={[
-          styles.challengeRow,
-          {
-            backgroundColor: isActive ? colors.tint + '10' : colors.card,
-            borderColor: isActive ? colors.tint + '30' : 'transparent',
-            borderWidth: isActive ? 1 : 0,
-            transform: [{ translateX }],
-          },
+        <View style={[styles.challengeIcon, { backgroundColor: isActive ? colors.tint + '25' : colors.progressBackground }]}>
+          <Ionicons
+            name={challenge.isPersonal ? "person" : "people"}
+            size={16}
+            color={isActive ? colors.tint : colors.textSecondary}
+          />
+        </View>
+        <View style={styles.challengeInfo}>
+          <Text style={[styles.challengeName, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            {challenge.name}
+          </Text>
+          <Text style={[styles.challengeMeta, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+            {challenge.exerciseType} · {challenge.totalGoal.toLocaleString()} total
+          </Text>
+        </View>
+        {isActive && (
+          <View style={[styles.activeBadge, { backgroundColor: colors.tint + '20' }]}>
+            <Ionicons name="radio-button-on" size={10} color={colors.tint} />
+            <Text style={[styles.activeBadgeText, { color: colors.tint }]}>Active</Text>
+          </View>
+        )}
+      </Pressable>
+      <Pressable
+        onPress={() => onDelete(challenge.id, challenge.name)}
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.deleteIconBtn,
+          { backgroundColor: pressed ? colors.error + '25' : colors.error + '12' },
         ]}
       >
-        <Pressable
-          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-          onPress={() => {
-            if (isOpen.current) {
-              closeRow();
-            } else {
-              onActivate(challenge.id);
-            }
-          }}
-        >
-          <View style={[styles.challengeIcon, { backgroundColor: isActive ? colors.tint + '25' : colors.progressBackground }]}>
-            <Ionicons
-              name={challenge.isPersonal ? "person" : "people"}
-              size={16}
-              color={isActive ? colors.tint : colors.textSecondary}
-            />
-          </View>
-          <View style={styles.challengeInfo}>
-            <Text style={[styles.challengeName, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-              {challenge.name}
-            </Text>
-            <Text style={[styles.challengeMeta, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              {challenge.exerciseType} · {challenge.totalGoal.toLocaleString()} total
-            </Text>
-          </View>
-          {isActive && (
-            <View style={[styles.activeBadge, { backgroundColor: colors.tint + '20' }]}>
-              <Ionicons name="radio-button-on" size={10} color={colors.tint} />
-              <Text style={[styles.activeBadgeText, { color: colors.tint }]}>Active</Text>
-            </View>
-          )}
-          <Ionicons name="chevron-back" size={14} color={colors.textSecondary} style={{ opacity: 0.3 }} />
-        </Pressable>
-      </RNAnimated.View>
+        <Ionicons name="trash-outline" size={18} color={colors.error} />
+      </Pressable>
     </View>
   );
 }
@@ -445,7 +376,7 @@ export default function SettingsScreen() {
                     Group Challenges
                   </Text>
                   {groupChallenges.map((challenge) => (
-                    <SwipeableChallenge
+                    <ChallengeRow
                       key={challenge.id}
                       challenge={challenge}
                       onDelete={handleDeleteChallenge}
@@ -462,7 +393,7 @@ export default function SettingsScreen() {
                     Personal Challenges
                   </Text>
                   {personalChallenges.map((challenge) => (
-                    <SwipeableChallenge
+                    <ChallengeRow
                       key={challenge.id}
                       challenge={challenge}
                       onDelete={handleDeleteChallenge}
@@ -473,8 +404,8 @@ export default function SettingsScreen() {
                   ))}
                 </>
               )}
-              <Text style={[styles.swipeHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Tap to activate · Swipe left to delete
+              <Text style={[styles.challengeHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                Tap to activate
               </Text>
             </>
           )}
@@ -655,30 +586,22 @@ const styles = StyleSheet.create({
   actionButton: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, gap: 12 },
   actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { flex: 1, fontSize: 16 },
-  challengeRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14 },
+  challengeRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, marginBottom: 6 },
   challengeIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   challengeInfo: { flex: 1, gap: 2 },
   challengeName: { fontSize: 15 },
   challengeMeta: { fontSize: 12 },
   activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 6 },
   activeBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  swipeContainer: { position: 'relative', marginBottom: 6 },
-  deleteBackground: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 80,
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
-  },
-  deleteBackgroundInner: {
-    flex: 1,
-    width: '100%',
+  deleteIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
-  swipeHint: { fontSize: 11, textAlign: 'center', marginTop: 2 },
+  challengeHint: { fontSize: 11, textAlign: 'center', marginTop: 2 },
   footer: { alignItems: 'center', paddingVertical: 20 },
   footerText: { fontSize: 14 },
   modalOverlay: {
