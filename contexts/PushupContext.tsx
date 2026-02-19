@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, queryClient } from '@/lib/query-client';
-import { differenceInDays, parseISO, startOfDay, format } from 'date-fns';
+import { differenceInDays, parseISO } from 'date-fns';
 
 const ACTIVE_CHALLENGE_KEY = 'repgather_active_challenge';
 
@@ -72,28 +72,36 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
 
   const percentComplete = goalValue > 0 ? (totalCompleted / goalValue) * 100 : 0;
 
-  const today = startOfDay(new Date());
-  const end = startOfDay(parseISO(challenge.endDate));
-  const start = startOfDay(parseISO(challenge.startDate));
-  const daysRemaining = Math.max(1, differenceInDays(end, today) + 1);
+  const todayStr = getTodayDateString();
+  const todayLocal = parseISO(todayStr);
+  const end = parseISO(challenge.endDate);
+  const start = parseISO(challenge.startDate);
+  const daysAfterToday = Math.max(0, differenceInDays(end, todayLocal));
   const totalDays = differenceInDays(end, start) + 1;
+  const daysRemaining = daysAfterToday;
 
   const remaining = goalValue - totalCompleted;
-  const dynamicDailyTarget = remaining <= 0 ? 0 : Math.ceil(remaining / daysRemaining);
+  const daysForTarget = Math.max(1, daysRemaining + 1);
+  const dynamicDailyTarget = remaining <= 0 ? 0 : Math.ceil(remaining / daysForTarget);
 
-  const todayStr = getTodayDateString();
   const todayLog = logs.find(log => log.date === todayStr);
   const todayCount = todayLog?.count || 0;
 
   const logsByDate = new Map(logs.map(l => [l.date, l]));
   let streak = 0;
-  let checkDate = new Date();
-  const todayForStreak = format(checkDate, 'yyyy-MM-dd');
-  if (!logsByDate.has(todayForStreak) || (logsByDate.get(todayForStreak)?.count ?? 0) === 0) {
+  const checkDate = new Date();
+  const checkDateStr = getTodayDateString();
+  if (logsByDate.has(checkDateStr) && (logsByDate.get(checkDateStr)?.count ?? 0) > 0) {
+    streak++;
+    checkDate.setDate(checkDate.getDate() - 1);
+  } else {
     checkDate.setDate(checkDate.getDate() - 1);
   }
   for (let i = 0; i < 366; i++) {
-    const expectedDate = format(checkDate, 'yyyy-MM-dd');
+    const yr = checkDate.getFullYear();
+    const mo = String(checkDate.getMonth() + 1).padStart(2, '0');
+    const dy = String(checkDate.getDate()).padStart(2, '0');
+    const expectedDate = `${yr}-${mo}-${dy}`;
     const log = logsByDate.get(expectedDate);
     if (log && log.count > 0) {
       streak++;
