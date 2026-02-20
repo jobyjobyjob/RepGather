@@ -434,6 +434,8 @@ export default function TodayScreen() {
   const dynamicTarget = progress?.dynamicDailyTarget || 0;
   const todayProgress = dynamicTarget > 0 ? Math.min(100, (currentCount / dynamicTarget) * 100) : 0;
   const todayComplete = dynamicTarget > 0 && currentCount >= dynamicTarget;
+  const dayIsSaved = !hasUnsavedChanges && currentCount > 0;
+  const showDailyTarget = !dayIsSaved;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -484,36 +486,38 @@ export default function TodayScreen() {
           </Text>
         </View>
 
-        <View style={[styles.dailyCard, { backgroundColor: colors.card }]}>
-          <View style={styles.dailyHeader}>
-            <Text style={[styles.dailyTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-              Today's Target
-            </Text>
-            <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : colors.tint + '20' }]}>
-              <Text style={[styles.targetText, { color: todayComplete ? colors.success : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
-                {dynamicTarget} needed
+        {showDailyTarget && (
+          <View style={[styles.dailyCard, { backgroundColor: colors.card }]}>
+            <View style={styles.dailyHeader}>
+              <Text style={[styles.dailyTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                Today's Target
+              </Text>
+              <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : colors.tint + '20' }]}>
+                <Text style={[styles.targetText, { color: todayComplete ? colors.success : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
+                  {dynamicTarget} needed
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.todayProgressBar}>
+              <View style={[styles.progressTrack, { backgroundColor: colors.progressBackground }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: todayComplete ? colors.success : colors.tint,
+                      width: `${Math.min(100, todayProgress)}%`,
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                {currentCount} / {dynamicTarget}
+                {todayComplete && ' - Complete!'}
               </Text>
             </View>
           </View>
-
-          <View style={styles.todayProgressBar}>
-            <View style={[styles.progressTrack, { backgroundColor: colors.progressBackground }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    backgroundColor: todayComplete ? colors.success : colors.tint,
-                    width: `${Math.min(100, todayProgress)}%`,
-                  }
-                ]}
-              />
-            </View>
-            <Text style={[styles.todayProgressText, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              {currentCount} / {dynamicTarget}
-              {todayComplete && ' - Complete!'}
-            </Text>
-          </View>
-        </View>
+        )}
 
         <View style={styles.counterSection}>
           <View style={styles.counterRow}>
