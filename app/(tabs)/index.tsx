@@ -705,6 +705,8 @@ export default function TodayScreen() {
             endDate={activeChallenge.endDate}
             colors={colors}
             exerciseLabel={exerciseLabel}
+            futureTargets={progress?.futureTargets}
+            dynamicDailyTarget={progress?.dynamicDailyTarget}
           />
         )}
 
