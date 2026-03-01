@@ -91,6 +91,8 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-03-01: Daily goal celebration popup: when user saves a day meeting/exceeding the daily target, a modal with motivational message appears. Messages stored in constants/dailyGoalMessages.ts (10 messages, rotates by day of year)
+- 2026-03-01: Fixed challenge completion: "Save" button no longer deletes challenge; completed challenges remain visible in challenge list with status "completed"
 - 2026-02-11: Fixed streak counter: now starts from yesterday if today has no entry; useFocusEffect on Home/History tabs ensures logs refresh after edits
 - 2026-02-09: Migrated database to external Neon PostgreSQL (user-owned account); EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
 - 2026-02-09: Swipe-left-to-delete gesture for challenges in Settings tab using PanResponder

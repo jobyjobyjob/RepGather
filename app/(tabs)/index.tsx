@@ -8,6 +8,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, w
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Colors from '@/constants/colors';
+import { getDailyGoalMessage } from '@/constants/dailyGoalMessages';
 import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -180,6 +181,67 @@ function AchievementModal({ visible, onComplete, onKeepGoing, onDelete, colors, 
   );
 }
 
+function DailyGoalModal({ visible, onDismiss, colors, message }: {
+  visible: boolean;
+  onDismiss: () => void;
+  colors: any;
+  message: string;
+}) {
+  const starScale = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      starScale.value = withDelay(100, withSpring(1, { damping: 8, stiffness: 120 }));
+    } else {
+      starScale.value = 0;
+    }
+  }, [visible]);
+
+  const starAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: starScale.value }],
+  }));
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={dailyGoalStyles.overlay}>
+        <View style={[dailyGoalStyles.container, { backgroundColor: colors.card }]}>
+          <Animated.View style={[dailyGoalStyles.iconContainer, starAnimStyle]}>
+            <LinearGradient
+              colors={['#34D399', '#10B981']}
+              style={dailyGoalStyles.iconGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={dailyGoalStyles.iconEmoji}>⭐</Text>
+            </LinearGradient>
+          </Animated.View>
+
+          <Text style={[dailyGoalStyles.title, { color: colors.text }]}>
+            Daily Goal Reached!
+          </Text>
+
+          <Text style={[dailyGoalStyles.message, { color: colors.textSecondary }]}>
+            {message}
+          </Text>
+
+          <Pressable
+            onPress={onDismiss}
+            style={({ pressed }) => [
+              dailyGoalStyles.dismissButton,
+              { backgroundColor: colors.tint },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={dailyGoalStyles.dismissButtonText}>
+              Let's Go!
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function TodayScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -200,6 +262,8 @@ export default function TodayScreen() {
   );
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
+  const [showDailyGoalModal, setShowDailyGoalModal] = useState(false);
+  const [dailyGoalMessage, setDailyGoalMessage] = useState('');
   const [goalCelebrated, setGoalCelebrated] = useState(false);
   const prevPercentRef = useRef<number>(0);
   const [localCount, setLocalCount] = useState<number | null>(null);
@@ -309,6 +373,12 @@ export default function TodayScreen() {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     await updateLog(today, localCount);
     setSavedCount(localCount);
+
+    const target = progress?.dynamicDailyTarget || 0;
+    if (target > 0 && localCount >= target) {
+      setDailyGoalMessage(getDailyGoalMessage());
+      setShowDailyGoalModal(true);
+    }
   };
 
   const handleChallengeSelect = (id: string) => {
@@ -645,6 +715,13 @@ export default function TodayScreen() {
         totalCompleted={progress?.totalCompleted || 0}
         goalValue={goalValue}
       />
+
+      <DailyGoalModal
+        visible={showDailyGoalModal}
+        onDismiss={() => setShowDailyGoalModal(false)}
+        colors={colors}
+        message={dailyGoalMessage}
+      />
     </View>
   );
 }
@@ -721,6 +798,62 @@ const achieveStyles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
     flex: 1,
+  },
+});
+
+const dailyGoalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  container: {
+    width: '100%',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 28,
+    alignItems: 'center',
+  },
+  iconContainer: {
+    marginBottom: 16,
+  },
+  iconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconEmoji: {
+    fontSize: 40,
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  message: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  dismissButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  dismissButtonText: {
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: '#FFFFFF',
   },
 });
 
