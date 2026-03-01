@@ -268,15 +268,10 @@ export function PushupProvider({ children }: { children: ReactNode }) {
 
   const completeChallengeAction = useCallback(async (challengeId: string) => {
     await apiRequest("POST", `/api/challenges/${challengeId}/complete`);
-    if (activeChallengeId === challengeId) {
-      await AsyncStorage.removeItem(ACTIVE_CHALLENGE_KEY);
-      setActiveChallengeIdState(null);
-      setLogs([]);
-    }
     await fetchChallenges();
     queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
     queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
-  }, [activeChallengeId, fetchChallenges]);
+  }, [fetchChallenges]);
 
   const value = useMemo(() => ({
     isLoading,
