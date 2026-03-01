@@ -64,6 +64,7 @@ Preferred communication style: Simple, everyday language.
   - **Weekender** (weekender): Light weekdays (0.75x), heavy weekends (1.625x)
 - "Debt Dashboard": When user falls behind original pace, label changes to "Adjusted Goal" in orange/yellow with caption "Adjusted to keep you on track."
 - originalTotalGoal preserves initial goal value for debt detection
+- History calendar shows projected future daily targets below upcoming dates (in secondary text color), recalculated on each "Complete Day" save; simulates forward using Spread the Debt + mode multipliers
 
 ### Groups Tab
 - Shows only non-personal (collaborative) groups

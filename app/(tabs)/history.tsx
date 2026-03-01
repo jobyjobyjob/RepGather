@@ -81,13 +81,14 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   );
 }
 
-function MonthCalendar({ month, logs, onDayPress, colors, challengeStartDate, challengeEndDate }: {
+function MonthCalendar({ month, logs, onDayPress, colors, challengeStartDate, challengeEndDate, futureTargets }: {
   month: Date;
   logs: Array<{ id: string; date: string; count: number }>;
   onDayPress: (date: string) => void;
   colors: any;
   challengeStartDate?: string;
   challengeEndDate?: string;
+  futureTargets?: Map<string, number>;
 }) {
   const today = new Date();
 
@@ -127,6 +128,8 @@ function MonthCalendar({ month, logs, onDayPress, colors, challengeStartDate, ch
           const count = logMap.get(dateStr) || 0;
           const hasActivity = count > 0;
           const isToday = isSameDay(day, today);
+          const isFuture = isAfter(day, today);
+          const futureTarget = isFuture && futureTargets ? futureTargets.get(dateStr) : undefined;
 
           const inChallengeRange = chalStart && chalEnd
             ? (isSameDay(day, chalStart) || isAfter(day, chalStart)) && (isSameDay(day, chalEnd) || isBefore(day, chalEnd))
@@ -162,6 +165,11 @@ function MonthCalendar({ month, logs, onDayPress, colors, challengeStartDate, ch
               {hasActivity && inCurrentMonth && (
                 <Text style={[styles.calDayCount, { color: colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
                   {count}
+                </Text>
+              )}
+              {!hasActivity && futureTarget != null && futureTarget > 0 && inCurrentMonth && inChallengeRange && (
+                <Text style={[styles.calDayCount, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                  {futureTarget}
                 </Text>
               )}
             </Pressable>
@@ -341,6 +349,7 @@ export default function HistoryScreen() {
             colors={colors}
             challengeStartDate={activeChallenge.startDate}
             challengeEndDate={activeChallenge.endDate}
+            futureTargets={progress?.futureTargets}
           />
           <Text style={[styles.calHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
             Tap any day to edit

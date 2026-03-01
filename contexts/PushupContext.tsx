@@ -36,7 +36,7 @@ export interface LogEntry {
   count: number;
 }
 
-interface ProgressData {
+export interface ProgressData {
   totalCompleted: number;
   percentComplete: number;
   daysRemaining: number;
@@ -45,6 +45,7 @@ interface ProgressData {
   todayCount: number;
   streak: number;
   isDebtActive: boolean;
+  futureTargets: Map<string, number>;
 }
 
 interface PushupContextValue {
@@ -155,6 +156,26 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
     }
   }
 
+  const futureTargets = new Map<string, number>();
+  if (remaining > 0 && daysRemaining > 0) {
+    let simulatedRemaining = remaining - todayCount;
+    for (let d = 1; d <= daysRemaining; d++) {
+      const futureDate = new Date(todayLocal.getTime() + d * 86400000);
+      const yr = futureDate.getFullYear();
+      const mo = String(futureDate.getMonth() + 1).padStart(2, '0');
+      const dy = String(futureDate.getDate()).padStart(2, '0');
+      const futureDateStr = `${yr}-${mo}-${dy}`;
+      const futureDaysLeft = Math.max(1, daysRemaining - d + 1);
+      const futureBase = simulatedRemaining <= 0 ? 0 : Math.ceil(simulatedRemaining / futureDaysLeft);
+      const futureMultiplier = getModeMultiplier(challenge, futureDateStr);
+      const futureTarget = simulatedRemaining <= 0 ? 0 : Math.ceil(futureBase * futureMultiplier);
+      if (futureTarget > 0) {
+        futureTargets.set(futureDateStr, futureTarget);
+        simulatedRemaining -= futureTarget;
+      }
+    }
+  }
+
   return {
     totalCompleted,
     percentComplete,
@@ -164,6 +185,7 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
     todayCount,
     streak,
     isDebtActive,
+    futureTargets,
   };
 }
 
