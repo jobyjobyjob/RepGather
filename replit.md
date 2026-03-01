@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Models
 - **Users**: id, username, displayName, password
-- **Groups**: id, name, inviteCode (6-char), exerciseType, goalType, totalGoal, individualGoal, startDate, endDate, isPersonal, createdBy
+- **Groups**: id, name, inviteCode (6-char), exerciseType, goalType, totalGoal, originalTotalGoal, targetStyle, startDate, endDate, isPersonal, status, createdBy
 - **GroupMembers**: id, groupId, userId, individualGoal, joinedAt
 - **DailyLogs**: id, userId, groupId, date, count (unique per user+group+date)
 
@@ -54,6 +54,16 @@ Preferred communication style: Simple, everyday language.
 - Challenge picker (horizontal scrolling chips) shown in Today and History tabs
 - Only one challenge can be "active" at a time for tracking
 - Active challenge ID stored in AsyncStorage for persistence
+
+### Adaptive Challenge Engine (Target Styles)
+- Daily targets use a "Spread the Debt" model: DailyTarget = ceil(remaining / daysLeft) × ModeMultiplier
+- Four target styles available during challenge creation:
+  - **Even Split** (even): 1x multiplier, same target every day (default)
+  - **The Ascent** (ascent): Starts easy, finishes hard (0.7x → 0.9x → 1.1x → 1.3x by quartile)
+  - **Weekday Warrior** (weekday_warrior): Heavy weekdays (1.25x), light weekends (0.375x)
+  - **Weekender** (weekender): Light weekdays (0.75x), heavy weekends (1.625x)
+- "Debt Dashboard": When user falls behind original pace, label changes to "Adjusted Goal" in orange/yellow with caption "Adjusted to keep you on track."
+- originalTotalGoal preserves initial goal value for debt detection
 
 ### Groups Tab
 - Shows only non-personal (collaborative) groups

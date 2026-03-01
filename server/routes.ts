@@ -150,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create personal challenge
   app.post("/api/challenges/personal", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { name, exerciseType, totalGoal, startDate, endDate } = req.body;
+      const { name, exerciseType, totalGoal, targetStyle, startDate, endDate } = req.body;
       if (!name || !totalGoal || !startDate || !endDate) {
         return res.status(400).json({ message: "Name, goal, start date, and end date are required" });
       }
@@ -159,6 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         exerciseType: exerciseType || "Push-ups",
         goalType: "group",
         totalGoal,
+        targetStyle: targetStyle || "even",
         startDate,
         endDate,
         isPersonal: true,

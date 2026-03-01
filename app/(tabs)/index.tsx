@@ -506,6 +506,7 @@ export default function TodayScreen() {
   const todayComplete = dynamicTarget > 0 && currentCount >= dynamicTarget;
   const dayIsSaved = !hasUnsavedChanges && currentCount > 0;
   const showDailyTarget = !dayIsSaved;
+  const isDebtActive = progress?.isDebtActive || false;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -559,15 +560,21 @@ export default function TodayScreen() {
         {showDailyTarget && (
           <View style={[styles.dailyCard, { backgroundColor: colors.card }]}>
             <View style={styles.dailyHeader}>
-              <Text style={[styles.dailyTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
-                Today's Target
+              <Text style={[styles.dailyTitle, { color: isDebtActive ? '#F59E0B' : colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                {isDebtActive ? 'Adjusted Goal' : "Today's Target"}
               </Text>
-              <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : colors.tint + '20' }]}>
-                <Text style={[styles.targetText, { color: todayComplete ? colors.success : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
+              <View style={[styles.targetBadge, { backgroundColor: todayComplete ? colors.success + '20' : isDebtActive ? '#F59E0B20' : colors.tint + '20' }]}>
+                <Text style={[styles.targetText, { color: todayComplete ? colors.success : isDebtActive ? '#F59E0B' : colors.tint, fontFamily: 'Inter_600SemiBold' }]}>
                   {dynamicTarget} needed
                 </Text>
               </View>
             </View>
+
+            {isDebtActive && !todayComplete && (
+              <Text style={[styles.debtCaption, { color: '#F59E0B' }]}>
+                Adjusted to keep you on track.
+              </Text>
+            )}
 
             <View style={styles.todayProgressBar}>
               <View style={[styles.progressTrack, { backgroundColor: colors.progressBackground }]}>
@@ -575,7 +582,7 @@ export default function TodayScreen() {
                   style={[
                     styles.progressFill,
                     {
-                      backgroundColor: todayComplete ? colors.success : colors.tint,
+                      backgroundColor: todayComplete ? colors.success : isDebtActive ? '#F59E0B' : colors.tint,
                       width: `${Math.min(100, todayProgress)}%`,
                     }
                   ]}
@@ -946,6 +953,12 @@ const styles = StyleSheet.create({
   },
   targetText: {
     fontSize: 14,
+  },
+  debtCaption: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    marginTop: 4,
+    marginBottom: -4,
   },
   todayProgressBar: {
     gap: 8,

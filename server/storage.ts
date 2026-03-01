@@ -48,6 +48,7 @@ export async function createGroup(data: {
   exerciseType?: string;
   goalType?: string;
   totalGoal: number;
+  targetStyle?: string;
   startDate: string;
   endDate: string;
   isPersonal?: boolean;
@@ -59,6 +60,8 @@ export async function createGroup(data: {
     exerciseType: data.exerciseType || "Push-ups",
     goalType: data.goalType || "group",
     totalGoal: data.totalGoal,
+    originalTotalGoal: data.totalGoal,
+    targetStyle: data.targetStyle || "even",
     startDate: data.startDate,
     endDate: data.endDate,
     isPersonal: data.isPersonal || false,

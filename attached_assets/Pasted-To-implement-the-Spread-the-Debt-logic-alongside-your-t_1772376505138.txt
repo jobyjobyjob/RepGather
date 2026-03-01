@@ -1,0 +1,68 @@
+To implement the "Spread the Debt" logic alongside your three challenge modes, your AI app creator needs to update both the **Target Engine** and the **UI Controller**.
+
+Below are the comprehensive instructions formatted for an AI tool to interpret and execute.
+
+---
+
+### Implementation Instructions: RepGather Challenge Engine
+
+**Task:** Update the backend challenge logic and frontend UI to support adaptive daily targets and the "Spread the Debt" recovery model.
+
+#### 1. Core Data Logic: Adaptive Target Calculation
+
+Modify the target calculation function to be **dynamic** rather than static.
+
+* **Logic Rule:** The "Daily Goal" is no longer fixed at challenge creation. It must be recalculated every time the user opens the app or logs a rep.
+* **The Formula:** `DailyTarget = (TotalGoal - CurrentTotalReps) / RemainingDays`
+* **Mode Multipliers:** Apply the following weights to the `DailyTarget` based on the day of the week or challenge progress:
+1. **Weekday Warrior:** Mon–Fri (1.25x), Sat–Sun (0.375x).
+2. **The Ascent:** Linear ramp from 70% of average (Day 1) to 130% (Final Day).
+3. **Weekender:** Mon–Fri (0.75x), Sat–Sun (1.625x).
+
+
+
+#### 2. Handling "Debt" (Spread the Debt Approach)
+
+* **Definition:** If a user finishes a day under-target, the "unmet reps" are not flagged as a permanent fail. Instead, the `TotalGoal - CurrentTotalReps` numerator in the formula above naturally increases the target for all remaining days.
+* **Rounding:** Always use `Math.ceil()` for the current day's target to ensure the user stays ahead of the mathematical curve.
+
+---
+
+### 3. UI/UX: The "Pace" Dashboard
+
+Update the **Today Tab** to reflect the user's status relative to their original plan.
+
+#### Visual Elements:
+
+* **The Progress Ring:** Use a dual-stroke design.
+* *Stroke A (Primary):* User's actual completion.
+* *Stroke B (Ghost):* A faint "Pace Line" showing where they *should* be today according to the original Weekday Warrior or The Ascent plan.
+
+
+* **The Daily Bar Chart:** * Grey bars for past days.
+* Blue bar for today.
+* **Pulsing Red Top:** If the user is "in debt," the top portion of today's bar (the reps added by the "Spread the Debt" logic) should pulse or be a different color to show it is a "Catch-up" requirement.
+
+
+
+#### Text & Feedback:
+
+* **Status Badge:** If `CurrentReps < OriginalPlanReps`, display a badge: **"Catch-up Mode: +[X] reps added to daily avg."**
+* **Dynamic Tagline:** Replace generic text with: *"You're [X] reps behind the Weekender pace. We've spread them out to keep it doable!"*
+
+---
+
+### 4. Code Snippet for AI Interpreter (System Instructions)
+
+> "Update `shared/schema.ts` and `app/(tabs)/index.tsx`:
+> 1. In the `DailyLog` check, if `totalReps < expectedPace`, trigger the `recalculateTargets` utility.
+> 2. Implement the `SpreadTheDebt` function: `const newDaily = Math.ceil((group.totalGoal - userProgress) / daysLeft) * modeMultiplier`.
+> 3. Update the `BarChart` component to accept a `debtVolume` prop, rendering it as a semi-transparent overlay on the 'Today' bar."
+> 
+> 
+
+---
+
+### Next Step Recommendation
+
+Would you like me to generate a **"Debt Summary"** modal? This would be a small screen that pops up on Monday mornings to show the user exactly how many reps were "Spread" from the previous week into their new weekly schedule.

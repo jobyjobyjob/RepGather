@@ -19,10 +19,13 @@ export interface Challenge {
   exerciseType: string;
   goalType: string;
   totalGoal: number;
+  originalTotalGoal?: number | null;
+  targetStyle?: string;
   startDate: string;
   endDate: string;
   inviteCode: string;
   isPersonal: boolean;
+  status?: string;
   createdBy: string;
   myIndividualGoal?: number | null;
 }
@@ -41,6 +44,7 @@ interface ProgressData {
   dynamicDailyTarget: number;
   todayCount: number;
   streak: number;
+  isDebtActive: boolean;
 }
 
 interface PushupContextValue {
@@ -62,6 +66,37 @@ interface PushupContextValue {
 
 const PushupContext = createContext<PushupContextValue | null>(null);
 
+function getModeMultiplier(challenge: Challenge, todayStr: string): number {
+  const style = challenge.targetStyle || 'even';
+  if (style === 'even') return 1;
+
+  if (style === 'ascent') {
+    const start = parseISO(challenge.startDate);
+    const end = parseISO(challenge.endDate);
+    const today = parseISO(todayStr);
+    const totalDays = Math.max(1, differenceInDays(end, start) + 1);
+    const dayIndex = Math.max(0, differenceInDays(today, start));
+    const progress = dayIndex / totalDays;
+    if (progress < 0.25) return 0.7;
+    if (progress < 0.5) return 0.9;
+    if (progress < 0.75) return 1.1;
+    return 1.3;
+  }
+
+  const dayOfWeek = parseISO(todayStr).getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+  if (style === 'weekday_warrior') {
+    return isWeekend ? 0.375 : 1.25;
+  }
+
+  if (style === 'weekender') {
+    return isWeekend ? 1.625 : 0.75;
+  }
+
+  return 1;
+}
+
 function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData {
   const totalCompleted = logs.reduce((sum, log) => sum + log.count, 0);
 
@@ -82,7 +117,16 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
 
   const remaining = goalValue - totalCompleted;
   const daysForTarget = Math.max(1, daysRemaining + 1);
-  const dynamicDailyTarget = remaining <= 0 ? 0 : Math.ceil(remaining / daysForTarget);
+  const baseTarget = remaining <= 0 ? 0 : Math.ceil(remaining / daysForTarget);
+
+  const multiplier = getModeMultiplier(challenge, todayStr);
+  const dynamicDailyTarget = remaining <= 0 ? 0 : Math.ceil(baseTarget * multiplier);
+
+  const originalGoal = challenge.originalTotalGoal || goalValue;
+  const originalDailyPace = totalDays > 0 ? originalGoal / totalDays : 0;
+  const elapsedDays = Math.max(0, differenceInDays(todayLocal, start));
+  const expectedByNow = Math.ceil(originalDailyPace * elapsedDays);
+  const isDebtActive = totalCompleted < expectedByNow && remaining > 0;
 
   const todayLog = logs.find(log => log.date === todayStr);
   const todayCount = todayLog?.count || 0;
@@ -119,6 +163,7 @@ function calculateProgress(challenge: Challenge, logs: LogEntry[]): ProgressData
     dynamicDailyTarget,
     todayCount,
     streak,
+    isDebtActive,
   };
 }
 
@@ -244,6 +289,7 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     name: string;
     exerciseType: string;
     totalGoal: number;
+    targetStyle?: string;
     startDate: string;
     endDate: string;
   }): Promise<Challenge> => {

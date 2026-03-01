@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const TARGET_STYLES = ["even", "ascent", "weekday_warrior", "weekender"] as const;
+
 export const groups = pgTable("groups", {
   id: varchar("id")
     .primaryKey()
@@ -41,6 +43,8 @@ export const groups = pgTable("groups", {
   exerciseType: text("exercise_type").notNull().default("Push-ups"),
   goalType: text("goal_type").notNull().default("group"),
   totalGoal: integer("total_goal").notNull(),
+  originalTotalGoal: integer("original_total_goal"),
+  targetStyle: text("target_style").notNull().default("even"),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   isPersonal: boolean("is_personal").notNull().default(false),

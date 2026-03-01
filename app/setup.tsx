@@ -13,6 +13,13 @@ import CalendarDateRangePicker from '@/components/CalendarDateRangePicker';
 
 const PRESET_GOALS = [1000, 2000, 5000, 10000];
 
+const TARGET_STYLE_OPTIONS = [
+  { value: 'even', label: 'Even Split', description: 'Same target every day.' },
+  { value: 'ascent', label: 'The Ascent', description: 'Level up each week.' },
+  { value: 'weekday_warrior', label: 'Weekday Warrior', description: 'Crush it while you work.' },
+  { value: 'weekender', label: 'Weekender', description: 'Big moves on your days off.' },
+] as const;
+
 export default function SetupScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -29,6 +36,7 @@ export default function SetupScreen() {
   const [exerciseType, setExerciseType] = useState('Push-ups');
   const [customExercise, setCustomExercise] = useState('');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [targetStyle, setTargetStyle] = useState('even');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalDays = startDate && endDate
@@ -73,6 +81,7 @@ export default function SetupScreen() {
         name,
         exerciseType: effectiveExerciseType,
         totalGoal: amount,
+        targetStyle,
         startDate: startDateStr,
         endDate: endDateStr,
       });
@@ -240,6 +249,40 @@ export default function SetupScreen() {
           />
         </View>
 
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+            Challenge Style
+          </Text>
+          <View style={[styles.styleList, { borderColor: colors.border }]}>
+            {TARGET_STYLE_OPTIONS.map((option, index) => (
+              <Pressable
+                key={option.value}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setTargetStyle(option.value);
+                }}
+                style={[
+                  styles.styleRow,
+                  index < TARGET_STYLE_OPTIONS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                  targetStyle === option.value && { backgroundColor: colors.tint + '10' },
+                ]}
+              >
+                <View style={styles.styleRowText}>
+                  <Text style={[styles.styleLabel, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                    {option.label}
+                  </Text>
+                  <Text style={[styles.styleDesc, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                    {option.description}
+                  </Text>
+                </View>
+                {targetStyle === option.value && (
+                  <Ionicons name="checkmark" size={22} color={colors.tint} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         {isValid && (
           <View style={[styles.summaryCard, { backgroundColor: colors.tint + '15' }]}>
             <View style={styles.summaryRow}>
@@ -299,6 +342,11 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   summaryText: { fontSize: 15, flex: 1 },
   summarySubtext: { fontSize: 13, marginLeft: 30 },
+  styleList: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' as const },
+  styleRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: 14, paddingHorizontal: 16, minHeight: 60 },
+  styleRowText: { flex: 1, gap: 2 },
+  styleLabel: { fontSize: 15 },
+  styleDesc: { fontSize: 13 },
   footer: { paddingHorizontal: 20, paddingTop: 16 },
   startButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 18, borderRadius: 30 },
   startButtonText: { fontSize: 18 },

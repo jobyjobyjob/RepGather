@@ -1,0 +1,116 @@
+Here is the complete, consolidated technical specification for **RepGather**. You can copy and paste this entire block directly into a Replit document or share it with an AI developer tool to implement the new **Adaptive Challenge Engine**.
+
+---
+
+# RepGather: Adaptive Challenge Engine Specification
+
+## 1. Project Overview
+
+Transition the current static challenge logic to a **Dynamic Adaptive Target** system. The app will now recalculate daily goals in real-time based on the user's actual performance, using a **"Spread the Debt"** model to redistribute missed reps across remaining days.
+
+---
+
+## 2. Core Logic: The "Spread the Debt" Engine
+
+Instead of a fixed daily goal, the **Daily Target** must be recalculated every time the user logs in or adds a rep.
+
+**The Formula:**
+
+
+$$DailyTarget = \lceil \frac{TotalGoal - CurrentTotalReps}{RemainingDays} \rceil \times ModeMultiplier$$
+
+* **TotalGoal:** The original commitment (e.g., 1,000 push-ups).
+* **CurrentTotalReps:** Total reps officially logged to date.
+* **RemainingDays:** Days left in the challenge, including today.
+* **Ceiling ($\lceil \rceil$):** Always round up to ensure the user never falls behind mathematically.
+
+---
+
+## 3. Challenge Style Definitions (Multipliers)
+
+There are three distinct styles users can choose during setup. The `ModeMultiplier` varies based on the current day or progress:
+
+### **Style 1: The Ascent**
+
+* **Concept:** Start easy to build the habit, finish with high intensity.
+* **Logic:** Multiplier scales based on the challenge quartile.
+* **First 25% of days:** 0.7x
+* **25% to 50%:** 0.9x
+* **50% to 75%:** 1.1x
+* **Final 25%:** 1.3x
+
+
+
+### **Style 2: Weekday Warrior**
+
+* **Concept:** Heavy loading during the work week; rest on weekends.
+* **Logic:** * **Monday–Friday:** 1.25x
+* **Saturday–Sunday:** 0.375x
+
+
+
+### **Style 3: Weekender**
+
+* **Concept:** Maintain during the week; go big on your days off.
+* **Logic:** * **Monday–Friday:** 0.75x
+* **Saturday–Sunday:** 1.625x
+
+
+
+---
+
+## 4. Backend & Schema Updates (`shared/schema.ts`)
+
+Update the `groups` table to support these styles:
+
+1. Add `target_style`: Enum (`'ascent'`, `'weekday_warrior'`, `'weekender'`).
+2. Add `original_total_goal`: Integer (to preserve the initial goal even if daily targets shift).
+
+---
+
+## 5. Frontend UI Implementation
+
+### **A. Style Chooser (`app/setup.tsx`)**
+
+Implement a **Simple Selection List** for challenge creation:
+
+* **UI:** Vertical `Pressable` rows (60px height) with 1px separators.
+* **Interactions:** * **Voke Haptics:** Trigger `Haptics.impactAsync` on tap.
+* **Visuals:** Show a checkmark icon on the far right for the selected mode.
+
+
+* **Labels:**
+* **The Ascent:** "Level up each week."
+* **Weekday Warrior:** "Crush it while you work."
+* **Weekender:** "Big moves on your days off."
+
+
+
+### **B. The "Debt" Dashboard (`app/(tabs)/index.tsx`)**
+
+* **Dynamic Labeling:** If the user is behind their original pace, change the "Goal" label to **"Adjusted Goal"**.
+* **Visual Warning:** Render the target number in **Orange/Yellow** if "Spread the Debt" is active.
+* **Caption:** Add subtext: *"Adjusted to keep you on track."*
+
+---
+
+## 6. Positive Feedback System
+
+When a user hits 100% of their **Adjusted Target**, trigger a random celebration message:
+
+* "Beast mode: ACTIVATED! 🦁🔋"
+* "Absolute fire! 🔥 Level up again tomorrow! 🆙"
+* "Pure grit, zero quit! You owned today. 🏆👊"
+
+---
+
+### Recommended Testing Hardware
+
+To ensure the **haptics** and **Apple Health** step-syncing (for the Weekender mode) feel premium, I recommend testing on the latest native hardware.
+
+| Feature | Apple Watch Series 10 | WHOOP 5.0 One |
+| --- | --- | --- |
+| **Best For** | Native HealthKit Testing | Recovery Metrics |
+| **Key Advantage** | Seamless iOS Notification Sync | 24/7 Heart Rate |
+
+**Would you like me to generate the specific TypeScript code for the `calculateDailyTarget` function to save you the coding time?**
