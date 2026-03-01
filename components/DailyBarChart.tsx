@@ -19,15 +19,6 @@ interface DailyBarChartProps {
   dynamicDailyTarget?: number;
 }
 
-interface DayData {
-  date: string;
-  count: number;
-  target: number;
-  dayLabel: string;
-  isToday: boolean;
-  isFuture: boolean;
-}
-
 export default function DailyBarChart({
   logs,
   startDate,
@@ -50,7 +41,7 @@ export default function DailyBarChart({
 
     return days.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayLabel = format(date, 'E').charAt(0);
+      const dateLabel = format(date, 'd');
       const count = logsMap.get(dateStr) || 0;
       const isFuture = isAfter(date, today);
       const todayFlag = isDateToday(date);
@@ -66,7 +57,7 @@ export default function DailyBarChart({
         date: dateStr,
         count,
         target,
-        dayLabel,
+        dateLabel,
         isToday: todayFlag,
         isFuture,
       };
@@ -82,13 +73,25 @@ export default function DailyBarChart({
     return m;
   }, [dayData]);
 
-  const maxBarHeight = 100;
-  const minBarHeight = 2;
+  const yTicks = useMemo(() => {
+    const step = Math.ceil(maxValue / 4);
+    const ticks: number[] = [];
+    for (let v = 0; v <= maxValue; v += step) {
+      ticks.push(v);
+    }
+    if (ticks[ticks.length - 1] < maxValue) {
+      ticks.push(maxValue);
+    }
+    return ticks;
+  }, [maxValue]);
+
+  const chartHeight = 110;
   const barWidth = 28;
+  const yAxisWidth = 36;
 
   const getBarHeight = (value: number) => {
-    if (value === 0) return minBarHeight;
-    return Math.max(minBarHeight, (value / maxValue) * maxBarHeight);
+    if (value === 0) return 2;
+    return Math.max(2, (value / maxValue) * chartHeight);
   };
 
   const todayIndex = dayData.findIndex(d => d.isToday);
@@ -116,77 +119,133 @@ export default function DailyBarChart({
   return (
     <View style={[styles.container, { backgroundColor: colors.card }]}>
       <Text style={[styles.title, { color: colors.text }]}>Daily Activity</Text>
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        onLayout={scrollToToday}
-        contentContainerStyle={styles.chartScrollContent}
-      >
-        <View style={styles.chartContainer}>
-          {dayData.map(day => {
-            const actualHeight = getBarHeight(day.count);
-            const targetHeight = getBarHeight(day.target);
-            const isBarTapped = tappedDate === day.date;
-
+      <View style={styles.chartArea}>
+        <View style={[styles.yAxis, { width: yAxisWidth, height: chartHeight }]}>
+          {yTicks.slice().reverse().map((tick, i) => {
+            const bottom = (tick / maxValue) * chartHeight;
             return (
-              <View key={day.date} style={[styles.barWrapper, { width: barWidth }]}>
-                {isBarTapped && (
-                  <Text style={[styles.countLabel, { color: colors.text }]}>
-                    {day.count}{day.target > 0 ? `/${day.target}` : ''}
-                  </Text>
-                )}
-                <Pressable
-                  onPress={() => {
-                    setTappedDate(isBarTapped ? null : day.date);
-                    if (!isBarTapped) {
-                      setTimeout(() => setTappedDate(null), 2500);
-                    }
-                  }}
-                  style={styles.barArea}
-                >
-                  <View style={{ height: maxBarHeight, justifyContent: 'flex-end' }}>
-                    {day.target > 0 && (
-                      <View
-                        style={[
-                          styles.targetBar,
-                          {
-                            height: targetHeight,
-                            borderColor: colors.textSecondary,
-                          },
-                        ]}
-                      />
-                    )}
-                    <View
-                      style={[
-                        styles.actualBar,
-                        {
-                          height: actualHeight,
-                          backgroundColor: day.count === 0
-                            ? (day.isFuture ? 'transparent' : colors.progressBackground)
-                            : colors.tint,
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                        },
-                      ]}
-                    />
-                  </View>
-                  {day.isToday && <View style={[styles.todayIndicator, { backgroundColor: colors.tint }]} />}
-                </Pressable>
-                <Text style={[
-                  styles.dayLabel,
-                  { color: day.isToday ? colors.tint : colors.textSecondary },
-                  day.isToday && { fontFamily: 'Inter_700Bold' },
-                ]}>
-                  {day.dayLabel}
-                </Text>
-              </View>
+              <Text
+                key={i}
+                style={[
+                  styles.yLabel,
+                  {
+                    color: colors.textSecondary,
+                    position: 'absolute',
+                    bottom: bottom - 6,
+                    right: 4,
+                  },
+                ]}
+              >
+                {tick}
+              </Text>
             );
           })}
         </View>
-      </ScrollView>
+
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onLayout={scrollToToday}
+            contentContainerStyle={styles.chartScrollContent}
+          >
+            <View>
+              <View style={[styles.gridLines, { height: chartHeight }]}>
+                {yTicks.map((tick, i) => {
+                  const bottom = (tick / maxValue) * chartHeight;
+                  return (
+                    <View
+                      key={i}
+                      style={[
+                        styles.gridLine,
+                        {
+                          bottom,
+                          backgroundColor: colors.progressBackground,
+                          width: dayData.length * (barWidth + 6),
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+
+              <View style={[styles.barsRow, { height: chartHeight }]}>
+                {dayData.map(day => {
+                  const actualHeight = getBarHeight(day.count);
+                  const targetHeight = getBarHeight(day.target);
+                  const isBarTapped = tappedDate === day.date;
+
+                  return (
+                    <View key={day.date} style={[styles.barCol, { width: barWidth }]}>
+                      {isBarTapped && (
+                        <Text style={[styles.countLabel, { color: colors.text }]}>
+                          {day.count}{day.target > 0 ? `/${day.target}` : ''}
+                        </Text>
+                      )}
+                      <Pressable
+                        onPress={() => {
+                          setTappedDate(isBarTapped ? null : day.date);
+                          if (!isBarTapped) {
+                            setTimeout(() => setTappedDate(null), 2500);
+                          }
+                        }}
+                        style={styles.barPress}
+                      >
+                        <View style={{ height: chartHeight, justifyContent: 'flex-end' }}>
+                          {day.target > 0 && (
+                            <View
+                              style={[
+                                styles.targetBar,
+                                {
+                                  height: targetHeight,
+                                  borderColor: colors.textSecondary,
+                                },
+                              ]}
+                            />
+                          )}
+                          <View
+                            style={[
+                              styles.actualBar,
+                              {
+                                height: actualHeight,
+                                backgroundColor: day.count === 0
+                                  ? (day.isFuture ? 'transparent' : colors.progressBackground)
+                                  : colors.tint,
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                              },
+                            ]}
+                          />
+                        </View>
+                        {day.isToday && <View style={[styles.todayDot, { backgroundColor: colors.tint }]} />}
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <View style={styles.xAxis}>
+                {dayData.map(day => (
+                  <View key={day.date} style={[styles.xLabelWrap, { width: barWidth }]}>
+                    <Text
+                      style={[
+                        styles.xLabel,
+                        { color: day.isToday ? colors.tint : colors.textSecondary },
+                        day.isToday && { fontFamily: 'Inter_700Bold' },
+                      ]}
+                    >
+                      {day.dateLabel}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
     </View>
   );
 }
@@ -196,26 +255,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 20,
     borderRadius: 20,
-    gap: 16,
+    gap: 12,
   },
   title: {
     fontSize: 18,
     fontFamily: 'Inter_600SemiBold',
   },
+  chartArea: {
+    flexDirection: 'row',
+  },
+  yAxis: {
+    justifyContent: 'space-between',
+    marginRight: 2,
+  },
+  yLabel: {
+    fontSize: 10,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'right',
+  },
   chartScrollContent: {
     paddingRight: 16,
   },
-  chartContainer: {
+  gridLines: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  gridLine: {
+    position: 'absolute',
+    height: 1,
+    left: 0,
+  },
+  barsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 140,
     gap: 6,
   },
-  barWrapper: {
+  barCol: {
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
-  barArea: {
+  barPress: {
     width: '100%',
     alignItems: 'center',
   },
@@ -230,13 +310,21 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     minHeight: 2,
   },
-  todayIndicator: {
+  todayDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
     marginTop: 2,
   },
-  dayLabel: {
+  xAxis: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  xLabelWrap: {
+    alignItems: 'center',
+  },
+  xLabel: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
   },
