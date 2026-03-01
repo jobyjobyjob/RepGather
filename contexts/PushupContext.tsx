@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, queryClient } from '@/lib/query-client';
 import { differenceInDays, parseISO } from 'date-fns';
+import { getHealthSyncEnabled, getStepsForToday, initHealthSync, isHealthKitExercise } from '@/services/healthSync';
 
 const ACTIVE_CHALLENGE_KEY = 'repgather_active_challenge';
 
@@ -63,6 +65,7 @@ interface PushupContextValue {
   createPersonalChallenge: (data: { name: string; exerciseType: string; totalGoal: number; startDate: string; endDate: string }) => Promise<Challenge>;
   deleteChallenge: (challengeId: string) => Promise<void>;
   completeChallenge: (challengeId: string) => Promise<void>;
+  syncHealthKit: () => Promise<{ synced: boolean; steps?: number }>;
 }
 
 const PushupContext = createContext<PushupContextValue | null>(null);
@@ -341,6 +344,41 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
   }, [fetchChallenges]);
 
+  const syncHealthKit = useCallback(async (): Promise<{ synced: boolean; steps?: number }> => {
+    if (Platform.OS !== 'ios') return { synced: false };
+    if (!activeChallenge) return { synced: false };
+    if (!isHealthKitExercise(activeChallenge.exerciseType)) return { synced: false };
+
+    const enabled = await getHealthSyncEnabled();
+    if (!enabled) return { synced: false };
+
+    try {
+      await initHealthSync();
+      const steps = await getStepsForToday();
+      if (steps <= 0) return { synced: true, steps: 0 };
+
+      const today = getTodayDateString();
+      const todayLog = logs.find(l => l.date === today);
+      const currentCount = todayLog?.count || 0;
+
+      if (steps > currentCount) {
+        await apiRequest("POST", "/api/logs", {
+          groupId: activeChallenge.id,
+          date: today,
+          count: steps,
+        });
+        await fetchLogs(activeChallenge.id);
+        queryClient.invalidateQueries({ queryKey: ['/api/groups', activeChallenge.id, 'leaderboard'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+        return { synced: true, steps };
+      }
+      return { synced: true, steps: currentCount };
+    } catch (err) {
+      console.error('HealthKit sync failed:', err);
+      return { synced: false };
+    }
+  }, [activeChallenge, logs, fetchLogs]);
+
   const value = useMemo(() => ({
     isLoading,
     challenges,
@@ -356,7 +394,8 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     createPersonalChallenge,
     deleteChallenge: deleteChallengeAction,
     completeChallenge: completeChallengeAction,
-  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction, completeChallengeAction]);
+    syncHealthKit,
+  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction, completeChallengeAction, syncHealthKit]);
 
   return (
     <PushupContext.Provider value={value}>

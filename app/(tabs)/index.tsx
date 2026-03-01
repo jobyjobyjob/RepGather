@@ -251,14 +251,15 @@ export default function TodayScreen() {
   const {
     isLoading, challenges, activeChallengeId, activeChallenge,
     logs, progress, logActivity, updateLog, setActiveChallenge,
-    deleteChallenge, completeChallenge, refresh,
+    deleteChallenge, completeChallenge, refresh, syncHealthKit,
   } = usePushups();
   const { user } = useAuth();
 
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      syncHealthKit();
+    }, [refresh, syncHealthKit])
   );
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAchievementModal, setShowAchievementModal] = useState(false);

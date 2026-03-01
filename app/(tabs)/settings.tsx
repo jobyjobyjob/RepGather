@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator, TextInput, Modal, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Switch, Alert, useColorScheme, Platform, ActivityIndicator, TextInput, Modal, TouchableOpacity, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import Colors from '@/constants/colors';
 import { usePushups, Challenge } from '@/contexts/PushupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { AGE_RANGES, GENDER_OPTIONS } from '@shared/schema';
+import { isHealthKitAvailable, getHealthSyncEnabled, setHealthSyncEnabled, initHealthSync } from '@/services/healthSync';
 
 function ChallengeRow({ challenge, onDelete, colors, isActive, onActivate }: {
   challenge: Challenge;
@@ -113,9 +114,68 @@ export default function SettingsScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const { isLoading, challenges, activeChallengeId, setActiveChallenge, deleteChallenge } = usePushups();
+  const { isLoading, challenges, activeChallengeId, setActiveChallenge, deleteChallenge, syncHealthKit } = usePushups();
   const { user, logout, deleteAccount, updateProfile } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  const [healthKitAvailable, setHealthKitAvailable] = useState(false);
+  const [healthKitEnabled, setHealthKitEnabled] = useState(false);
+  const [healthSyncing, setHealthSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const available = await isHealthKitAvailable();
+      setHealthKitAvailable(available);
+      if (available) {
+        const enabled = await getHealthSyncEnabled();
+        setHealthKitEnabled(enabled);
+      }
+    })();
+  }, []);
+
+  const handleToggleHealthKit = useCallback(async (value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (value) {
+      try {
+        await initHealthSync();
+        await setHealthSyncEnabled(true);
+        setHealthKitEnabled(true);
+        const result = await syncHealthKit();
+        if (result.synced && result.steps != null) {
+          setLastSyncResult(`Synced: ${result.steps.toLocaleString()} steps`);
+        }
+      } catch {
+        Alert.alert('HealthKit Error', 'Could not connect to Apple Health. Please check your permissions in iOS Settings.');
+        await setHealthSyncEnabled(false);
+        setHealthKitEnabled(false);
+      }
+    } else {
+      await setHealthSyncEnabled(false);
+      setHealthKitEnabled(false);
+      setLastSyncResult(null);
+    }
+  }, [syncHealthKit]);
+
+  const handleManualSync = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setHealthSyncing(true);
+    try {
+      const result = await syncHealthKit();
+      if (result.synced) {
+        setLastSyncResult(`Synced: ${(result.steps || 0).toLocaleString()} steps`);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setLastSyncResult('Sync failed — check permissions');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch {
+      setLastSyncResult('Sync failed');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setHealthSyncing(false);
+    }
+  }, [syncHealthKit]);
 
   const [showProfile, setShowProfile] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -438,6 +498,82 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {(healthKitAvailable || Platform.OS === 'ios') && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
+              APPLE HEALTH
+            </Text>
+            <View style={[styles.card, { backgroundColor: colors.card, flexDirection: 'column', gap: 0 }]}>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Ionicons name="heart" size={22} color="#FF2D55" />
+                  <View style={styles.settingText}>
+                    <Text style={[styles.settingLabel, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                      HealthKit Sync
+                    </Text>
+                    <Text style={[styles.settingDescription, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                      Auto-sync steps for walking challenges
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={healthKitEnabled}
+                  onValueChange={handleToggleHealthKit}
+                  trackColor={{ false: colors.progressBackground, true: '#FF2D55' + '80' }}
+                  thumbColor={healthKitEnabled ? '#FF2D55' : colors.textSecondary}
+                />
+              </View>
+
+              {healthKitEnabled && (
+                <View style={styles.healthKitActions}>
+                  <Pressable
+                    onPress={handleManualSync}
+                    disabled={healthSyncing}
+                    style={({ pressed }) => [
+                      styles.healthBtn,
+                      { backgroundColor: colors.tint + '15' },
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    {healthSyncing ? (
+                      <ActivityIndicator size="small" color={colors.tint} />
+                    ) : (
+                      <Ionicons name="sync" size={18} color={colors.tint} />
+                    )}
+                    <Text style={[styles.healthBtnText, { color: colors.tint }]}>
+                      Manual Sync
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      if (Platform.OS === 'ios') {
+                        Linking.openURL('App-Prefs:Health');
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      styles.healthBtn,
+                      { backgroundColor: colors.textSecondary + '15' },
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+                    <Text style={[styles.healthBtnText, { color: colors.textSecondary }]}>
+                      Fix Permissions
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {lastSyncResult && (
+                <Text style={[styles.healthSyncStatus, { color: colors.textSecondary }]}>
+                  {lastSyncResult}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
             ACCOUNT
@@ -615,4 +751,31 @@ const styles = StyleSheet.create({
     paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10,
   },
   modalOptionText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
+  healthKitActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.15)',
+    marginTop: 14,
+  },
+  healthBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  healthBtnText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  healthSyncStatus: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    marginTop: 10,
+  },
 });

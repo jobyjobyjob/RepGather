@@ -115,6 +115,7 @@ export const EXERCISE_TYPES = [
   "Burpees",
   "Lunges",
   "Planks (seconds)",
+  "Walking (steps)",
   "Running (miles)",
   "Cycling (miles)",
   "Jump Rope",

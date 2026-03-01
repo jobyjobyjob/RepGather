@@ -104,6 +104,8 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 - 2026-03-01: Daily goal celebration popup: when user saves a day meeting/exceeding the daily target, a modal with motivational message appears. Messages stored in constants/dailyGoalMessages.ts (10 messages, rotates by day of year)
 - 2026-03-01: DailyBarChart updated to show full challenge period (scrollable horizontally); future days show dashed outline target bars, past days show solid orange actual bars; auto-scrolls to today
+- 2026-03-01: Apple HealthKit integration: services/healthSync.ts service, Settings "APPLE HEALTH" control center (toggle, manual sync, fix permissions), auto-sync on home screen focus for walking challenges; requires dev build for native testing
+- 2026-03-01: Added "Walking (steps)" exercise type to EXERCISE_TYPES; HealthKit-enabled exercises auto-sync step count when HealthKit is enabled
 - 2026-03-01: Fixed challenge completion: "Save" button no longer deletes challenge; completed challenges remain visible in challenge list with status "completed"
 - 2026-02-11: Fixed streak counter: now starts from yesterday if today has no entry; useFocusEffect on Home/History tabs ensures logs refresh after edits
 - 2026-02-09: Migrated database to external Neon PostgreSQL (user-owned account); EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
