@@ -124,14 +124,11 @@ export default function SettingsScreen() {
   const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const available = await isHealthKitAvailable();
-      setHealthKitAvailable(available);
-      if (available) {
-        const enabled = await getHealthSyncEnabled();
-        setHealthKitEnabled(enabled);
-      }
-    })();
+    const available = Platform.OS === 'ios' && isHealthKitAvailable();
+    setHealthKitAvailable(available);
+    if (available) {
+      getHealthSyncEnabled().then(setHealthKitEnabled);
+    }
   }, []);
 
   const handleToggleHealthKit = useCallback(async (value: boolean) => {
@@ -145,8 +142,19 @@ export default function SettingsScreen() {
         if (result.synced && result.steps != null) {
           setLastSyncResult(`Synced: ${result.steps.toLocaleString()} steps`);
         }
-      } catch {
-        Alert.alert('HealthKit Error', 'Could not connect to Apple Health. Please check your permissions in iOS Settings.');
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('not available')) {
+          Alert.alert(
+            'HealthKit Not Available',
+            'Apple Health is not available on this device. Make sure you are running a development build (not Expo Go) with HealthKit entitlements enabled.'
+          );
+        } else {
+          Alert.alert(
+            'HealthKit Error',
+            'Could not connect to Apple Health. Go to Settings > Health > Data Access & Devices > RepGather and make sure access is enabled.'
+          );
+        }
         await setHealthSyncEnabled(false);
         setHealthKitEnabled(false);
       }
@@ -498,7 +506,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {(healthKitAvailable || Platform.OS === 'ios') && (
+        {Platform.OS === 'ios' && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
               APPLE HEALTH
@@ -548,7 +556,7 @@ export default function SettingsScreen() {
                   <Pressable
                     onPress={() => {
                       if (Platform.OS === 'ios') {
-                        Linking.openURL('App-Prefs:Health');
+                        Linking.openSettings();
                       }
                     }}
                     style={({ pressed }) => [

@@ -49,7 +49,9 @@
       [
         "react-native-health",
         {
-          "isClinicalDataEnabled": false
+          "isClinicalDataEnabled": false,
+          "healthSharePermission": "RepGather reads your steps to sync your walking challenges.",
+          "healthUpdatePermission": "RepGather syncs your workout progress back to Apple Health."
         }
       ]
     ],

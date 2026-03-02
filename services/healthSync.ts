@@ -4,29 +4,50 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const HEALTH_ENABLED_KEY = 'healthkit_enabled';
 
 let AppleHealthKit: any = null;
+let HealthConstants: any = null;
 
-async function loadHealthKit() {
+function loadHealthKit() {
   if (Platform.OS !== 'ios') return null;
+  if (AppleHealthKit) return AppleHealthKit;
   try {
-    const mod = await import('react-native-health');
-    AppleHealthKit = mod.default;
+    const mod = require('react-native-health');
+    AppleHealthKit = mod.default || mod;
+    HealthConstants = AppleHealthKit.Constants;
     return AppleHealthKit;
-  } catch {
+  } catch (e) {
+    console.warn('react-native-health not available:', e);
     return null;
   }
 }
 
-const permissions = {
-  permissions: {
-    read: ['Steps', 'DistanceWalkingRunning'],
-    write: ['Steps'],
-  },
-};
+function getPermissions() {
+  const hk = loadHealthKit();
+  if (!hk || !HealthConstants) {
+    return {
+      permissions: {
+        read: [],
+        write: [],
+      },
+    };
+  }
+  return {
+    permissions: {
+      read: [
+        HealthConstants.Permissions.Steps,
+        HealthConstants.Permissions.DistanceWalkingRunning,
+      ],
+      write: [
+        HealthConstants.Permissions.Steps,
+      ],
+    },
+  };
+}
 
-export async function isHealthKitAvailable(): Promise<boolean> {
+export function isHealthKitAvailable(): boolean {
   if (Platform.OS !== 'ios') return false;
-  const hk = await loadHealthKit();
-  return hk != null;
+  const hk = loadHealthKit();
+  if (!hk) return false;
+  return typeof hk.initHealthKit === 'function';
 }
 
 export async function getHealthSyncEnabled(): Promise<boolean> {
@@ -44,12 +65,17 @@ export async function setHealthSyncEnabled(enabled: boolean): Promise<void> {
 
 export async function initHealthSync(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
-  const hk = await loadHealthKit();
-  if (!hk) return false;
+  const hk = loadHealthKit();
+  if (!hk) throw new Error('react-native-health module not available');
+
+  const perms = getPermissions();
 
   return new Promise((resolve, reject) => {
-    hk.initHealthKit(permissions, (error: any) => {
-      if (error) return reject(error);
+    hk.initHealthKit(perms, (error: any) => {
+      if (error) {
+        console.error('HealthKit init error:', error);
+        return reject(error);
+      }
       resolve(true);
     });
   });
@@ -57,7 +83,7 @@ export async function initHealthSync(): Promise<boolean> {
 
 export async function getStepsForDate(date: Date): Promise<number> {
   if (Platform.OS !== 'ios') return 0;
-  const hk = await loadHealthKit();
+  const hk = loadHealthKit();
   if (!hk) return 0;
 
   return new Promise((resolve, reject) => {
@@ -81,7 +107,7 @@ export async function getStepsForDateRange(
   endDate: Date
 ): Promise<Array<{ date: string; count: number }>> {
   if (Platform.OS !== 'ios') return [];
-  const hk = await loadHealthKit();
+  const hk = loadHealthKit();
   if (!hk) return [];
 
   return new Promise((resolve, reject) => {
