@@ -3,51 +3,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HEALTH_ENABLED_KEY = 'healthkit_enabled';
 
-let AppleHealthKit: any = null;
-let HealthConstants: any = null;
+let _healthKit: any = null;
+let _loadAttempted = false;
 
-function loadHealthKit() {
+function getHealthKit(): any {
   if (Platform.OS !== 'ios') return null;
-  if (AppleHealthKit) return AppleHealthKit;
+  if (_healthKit) return _healthKit;
+  if (_loadAttempted) return null;
+
+  _loadAttempted = true;
   try {
     const mod = require('react-native-health');
-    AppleHealthKit = mod.default || mod;
-    HealthConstants = AppleHealthKit.Constants;
-    return AppleHealthKit;
+    _healthKit = mod.default || mod;
+    return _healthKit;
   } catch (e) {
-    console.warn('react-native-health not available:', e);
+    console.warn('[HealthSync] react-native-health not available:', e);
     return null;
   }
 }
 
-function getPermissions() {
-  const hk = loadHealthKit();
-  if (!hk || !HealthConstants) {
-    return {
-      permissions: {
-        read: [],
-        write: [],
-      },
-    };
-  }
-  return {
-    permissions: {
-      read: [
-        HealthConstants.Permissions.Steps,
-        HealthConstants.Permissions.DistanceWalkingRunning,
-      ],
-      write: [
-        HealthConstants.Permissions.Steps,
-      ],
-    },
-  };
-}
-
 export function isHealthKitAvailable(): boolean {
   if (Platform.OS !== 'ios') return false;
-  const hk = loadHealthKit();
-  if (!hk) return false;
-  return typeof hk.initHealthKit === 'function';
+  const hk = getHealthKit();
+  return hk != null && typeof hk.initHealthKit === 'function';
 }
 
 export async function getHealthSyncEnabled(): Promise<boolean> {
@@ -65,17 +43,47 @@ export async function setHealthSyncEnabled(enabled: boolean): Promise<void> {
 
 export async function initHealthSync(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
-  const hk = loadHealthKit();
-  if (!hk) throw new Error('react-native-health module not available');
 
-  const perms = getPermissions();
+  const hk = getHealthKit();
+  if (!hk) {
+    throw new Error('react-native-health module not available. This requires a development build — HealthKit does not work in Expo Go.');
+  }
+
+  const perms = {
+    permissions: {
+      read: [
+        hk.Constants?.Permissions?.StepCount || 'StepCount',
+        hk.Constants?.Permissions?.DistanceWalkingRunning || 'DistanceWalkingRunning',
+      ],
+      write: [
+        hk.Constants?.Permissions?.StepCount || 'StepCount',
+      ],
+    },
+  };
 
   return new Promise((resolve, reject) => {
     hk.initHealthKit(perms, (error: any) => {
       if (error) {
-        console.error('HealthKit init error:', error);
-        return reject(error);
+        console.error('[HealthSync] initHealthKit error:', JSON.stringify(error));
+        return reject(new Error(`HealthKit authorization failed: ${error?.message || JSON.stringify(error)}`));
       }
+
+      if (typeof hk.enableBackgroundDelivery === 'function') {
+        try {
+          hk.enableBackgroundDelivery(
+            hk.Constants?.Permissions?.StepCount || 'StepCount',
+            hk.Constants?.ObserverFrequencies?.Hourly || 2,
+            (bgErr: any) => {
+              if (bgErr) {
+                console.warn('[HealthSync] Background delivery setup failed (non-critical):', bgErr);
+              }
+            }
+          );
+        } catch (bgErr) {
+          console.warn('[HealthSync] Background delivery not supported:', bgErr);
+        }
+      }
+
       resolve(true);
     });
   });
@@ -83,7 +91,7 @@ export async function initHealthSync(): Promise<boolean> {
 
 export async function getStepsForDate(date: Date): Promise<number> {
   if (Platform.OS !== 'ios') return 0;
-  const hk = loadHealthKit();
+  const hk = getHealthKit();
   if (!hk) return 0;
 
   return new Promise((resolve, reject) => {
@@ -107,7 +115,7 @@ export async function getStepsForDateRange(
   endDate: Date
 ): Promise<Array<{ date: string; count: number }>> {
   if (Platform.OS !== 'ios') return [];
-  const hk = loadHealthKit();
+  const hk = getHealthKit();
   if (!hk) return [];
 
   return new Promise((resolve, reject) => {

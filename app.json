@@ -17,12 +17,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.pushuppro",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "RepGather reads your steps to sync your walking challenges.",
-        "NSHealthUpdateUsageDescription": "RepGather syncs your workout progress back to Apple Health."
-      },
-      "entitlements": {
-        "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.background-delivery": true
+        "NSHealthShareUsageDescription": "RepGather reads your step count from Apple Health to automatically track progress in your walking challenges.",
+        "NSHealthUpdateUsageDescription": "RepGather writes your workout progress back to Apple Health to keep your health data in sync."
       }
     },
     "android": {
@@ -50,8 +46,8 @@
         "react-native-health",
         {
           "isClinicalDataEnabled": false,
-          "healthSharePermission": "RepGather reads your steps to sync your walking challenges.",
-          "healthUpdatePermission": "RepGather syncs your workout progress back to Apple Health."
+          "healthSharePermission": "RepGather reads your step count from Apple Health to automatically track progress in your walking challenges.",
+          "healthUpdatePermission": "RepGather writes your workout progress back to Apple Health to keep your health data in sync."
         }
       ]
     ],
