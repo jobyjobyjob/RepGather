@@ -1,0 +1,47 @@
+To update RepGather with a "Shared Fate" collective group challenge system, copy and paste these instructions into your Replit agent. These instructions prioritize high-retention social features (nearing a "Pro" level of polish) while keeping the implementation free and accessible for your current user growth stage.
+Objective: Implement Collective Squad Challenges & Integrated Home UI
+Transition the app from purely individual tracking within a group to a Collective Goal model where every member's contribution feeds into a shared squad target.
+1. Database Schema Update (The Foundation)
+Update shared/schema.ts to support cumulative targets and tracking individual "shares."
+Instructions for Replit:
+Add the following fields to the groups table:
+ * goalType: Text field (default: 'individual'). Options: 'individual', 'collective'.
+ * collectiveTarget: Integer (nullable). The total goal for the whole squad.
+ * memberContributionTargets: JSONB field to store specific targets for different members (e.g., John: 9k, Sarah: 13k).
+2. Home Screen UI: The "Squad Toggle"
+Update app/(tabs)/index.tsx to allow users to switch focus between their personal daily ring and the Squad’s total progress.
+Instructions for Replit:
+ * Segmented Control: Add a toggle at the top of the Home Screen: [ Personal | Squad ].
+ * The Squad View: When "Squad" is selected, replace the individual Progress Ring with a "Squad Power Meter" (a large horizontal or circular progress bar).
+ * Real-time Math: Calculate totalSquadProgress by summing all members' logs for the current challenge.
+ * Visual "Push": Display a text overlay: "Squad is at 85%! Only 15,000 steps to the finish line!"
+3. Competitive UI: "The Engine Room"
+Transform the leaderboard into a "Contribution Feed" within the Squad view.
+Instructions for Replit:
+Modify the list view under the Squad Power Meter:
+ * Contribution %: Next to each name, show their percentage of the total group goal (e.g., "Sarah: Added 15%").
+ * "Pace" Indicators: Use a small colored icon (Green/Yellow/Red) next to names.
+   * Green: On track for their personal portion.
+   * Yellow: Slightly behind.
+   * Red: "Bottleneck" – has contributed 0 today.
+ * Social Nudge: Add a "Spark" (High-five) button next to "Red" status members that triggers a haptic feedback or local notification.
+4. Motivation & Rewards System
+Implement automated celebrations to make the collective effort feel rewarding.
+Instructions for Replit:
+ * Milestone Confetti: Trigger the ConfettiCelebration.tsx component when the Group hits 25%, 50%, 75%, and 100%.
+ * The "MVP" Splash: When the collective goal is reached, show a modal highlighting the "Top Contributor" and the "Most Improved" member.
+ * Simulated Sync: Use a local state check so that the first person to open the app after the goal is met sees a special "Victory Screen" they can share.
+5. Management & Editing (Future-Pro Ready)
+Update the group creation/edit logic to allow variable goals.
+Instructions for Replit:
+ * Flexible Targets: In the "Create/Edit Challenge" screen, allow the creator to set a collectiveTarget.
+ * Member Allocation: Add a simple list where the creator can override the default goal for specific members (e.g., setting one person to 9k and another to 13k).
+ * Status Logic: Ensure that when a Collective Challenge is "Archived," it saves the Group Total as a record in the History tab.
+6. Implementation Note for User Growth
+Instructions for Replit:
+Do not add any paywalls or "Pro" locks to these features yet. Build the goalType logic so it is "feature-flag ready." We will keep these collective features free to encourage viral growth (inviting friends to help hit a goal), but structure the code so we can easily toggle "Unlimited Collective Challenges" as a Pro feature later.
+Final Migration
+Instructions for Replit:
+Run the following to apply the schema changes and restart the development server:
+npx drizzle-kit push:pg
+

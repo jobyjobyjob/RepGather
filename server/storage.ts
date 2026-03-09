@@ -48,6 +48,7 @@ export async function createGroup(data: {
   exerciseType?: string;
   goalType?: string;
   totalGoal: number;
+  collectiveTarget?: number;
   targetStyle?: string;
   startDate: string;
   endDate: string;
@@ -61,6 +62,7 @@ export async function createGroup(data: {
     goalType: data.goalType || "group",
     totalGoal: data.totalGoal,
     originalTotalGoal: data.totalGoal,
+    collectiveTarget: data.goalType === 'collective' ? (data.collectiveTarget || data.totalGoal) : null,
     targetStyle: data.targetStyle || "even",
     startDate: data.startDate,
     endDate: data.endDate,
@@ -276,7 +278,7 @@ export async function completeChallenge(groupId: string, userId: string): Promis
 export async function updateChallenge(
   groupId: string,
   userId: string,
-  updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }
+  updates: { name?: string; totalGoal?: number; collectiveTarget?: number; status?: string; hasSeenCompletionModal?: boolean }
 ): Promise<Group | null> {
   const group = await getGroup(groupId);
   if (!group) return null;
@@ -295,6 +297,9 @@ export async function updateChallenge(
     if (updates.status === 'archived' || updates.status === 'completed') {
       setData.completedAt = new Date();
     }
+  }
+  if (updates.collectiveTarget !== undefined) {
+    setData.collectiveTarget = updates.collectiveTarget;
   }
   if (updates.hasSeenCompletionModal !== undefined) {
     setData.hasSeenCompletionModal = updates.hasSeenCompletionModal;
@@ -326,6 +331,101 @@ export async function deleteUser(userId: string): Promise<void> {
   await db.delete(dailyLogs).where(eq(dailyLogs.userId, userId));
   await db.delete(groupMembers).where(eq(groupMembers.userId, userId));
   await db.delete(users).where(eq(users.id, userId));
+}
+
+export async function getSquadProgress(groupId: string) {
+  const group = await getGroup(groupId);
+  if (!group) return null;
+
+  const members = await getGroupMembers(groupId);
+
+  const allLogs = await db
+    .select({
+      userId: dailyLogs.userId,
+      date: dailyLogs.date,
+      count: dailyLogs.count,
+    })
+    .from(dailyLogs)
+    .where(eq(dailyLogs.groupId, groupId));
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const memberStats = members.map(member => {
+    const memberLogs = allLogs.filter(l => l.userId === member.id);
+    const totalCount = memberLogs.reduce((sum, l) => sum + l.count, 0);
+    const todayLog = memberLogs.find(l => l.date === todayStr);
+    const todayCount = todayLog?.count || 0;
+
+    const memberTargets = (group.memberContributionTargets as Record<string, number>) || {};
+    const assignedTarget = memberTargets[member.id] || null;
+
+    return {
+      userId: member.id,
+      displayName: member.displayName,
+      totalCount,
+      todayCount,
+      assignedTarget,
+      individualGoal: member.individualGoal,
+    };
+  });
+
+  const squadTotal = memberStats.reduce((sum, m) => sum + m.totalCount, 0);
+  const collectiveTarget = group.collectiveTarget || group.totalGoal;
+
+  const startDate = new Date(group.startDate + 'T00:00:00');
+  const endDate = new Date(group.endDate + 'T00:00:00');
+  const today = new Date(todayStr + 'T00:00:00');
+  const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+  const elapsedDays = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / 86400000));
+  const expectedPace = totalDays > 0 ? (collectiveTarget / totalDays) * elapsedDays : 0;
+
+  const membersWithPace = memberStats.map(m => {
+    const memberTarget = m.assignedTarget || (collectiveTarget / Math.max(1, members.length));
+    const memberExpected = totalDays > 0 ? (memberTarget / totalDays) * elapsedDays : 0;
+    const contributionPct = collectiveTarget > 0 ? Math.round((m.totalCount / collectiveTarget) * 100) : 0;
+
+    let pace: 'green' | 'yellow' | 'red';
+    if (m.todayCount === 0 && elapsedDays > 0) {
+      pace = 'red';
+    } else if (m.totalCount >= memberExpected * 0.9) {
+      pace = 'green';
+    } else {
+      pace = 'yellow';
+    }
+
+    return {
+      ...m,
+      contributionPct,
+      pace,
+      memberTarget: Math.round(memberTarget),
+    };
+  });
+
+  return {
+    squadTotal,
+    collectiveTarget,
+    percentComplete: collectiveTarget > 0 ? Math.round((squadTotal / collectiveTarget) * 100) : 0,
+    remaining: Math.max(0, collectiveTarget - squadTotal),
+    totalDays,
+    daysRemaining: Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / 86400000)),
+    members: membersWithPace.sort((a, b) => b.totalCount - a.totalCount),
+    exerciseType: group.exerciseType,
+  };
+}
+
+export async function updateMemberTargets(groupId: string, userId: string, targets: Record<string, number>): Promise<Group | null> {
+  const group = await getGroup(groupId);
+  if (!group) return null;
+  if (group.createdBy !== userId) return null;
+
+  const [updated] = await db
+    .update(groups)
+    .set({ memberContributionTargets: targets })
+    .where(eq(groups.id, groupId))
+    .returning();
+
+  return updated || group;
 }
 
 export async function deleteChallenge(groupId: string, userId: string): Promise<void> {

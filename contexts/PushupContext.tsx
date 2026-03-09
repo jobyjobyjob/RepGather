@@ -22,6 +22,8 @@ export interface Challenge {
   goalType: string;
   totalGoal: number;
   originalTotalGoal?: number | null;
+  collectiveTarget?: number | null;
+  memberContributionTargets?: Record<string, number> | null;
   targetStyle?: string;
   startDate: string;
   endDate: string;
@@ -67,7 +69,7 @@ interface PushupContextValue {
   createPersonalChallenge: (data: { name: string; exerciseType: string; totalGoal: number; startDate: string; endDate: string }) => Promise<Challenge>;
   deleteChallenge: (challengeId: string) => Promise<void>;
   completeChallenge: (challengeId: string) => Promise<void>;
-  updateChallenge: (challengeId: string, updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }) => Promise<void>;
+  updateChallenge: (challengeId: string, updates: { name?: string; totalGoal?: number; collectiveTarget?: number; status?: string; hasSeenCompletionModal?: boolean }) => Promise<void>;
   syncHealthKit: () => Promise<{ synced: boolean; steps?: number }>;
 }
 
@@ -349,7 +351,7 @@ export function PushupProvider({ children }: { children: ReactNode }) {
 
   const updateChallengeAction = useCallback(async (
     challengeId: string,
-    updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }
+    updates: { name?: string; totalGoal?: number; collectiveTarget?: number; status?: string; hasSeenCompletionModal?: boolean }
   ) => {
     await apiRequest("PATCH", `/api/challenges/${challengeId}`, updates);
     await fetchChallenges();

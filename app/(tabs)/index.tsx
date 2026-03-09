@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useQuery } from '@tanstack/react-query';
 
 import Colors from '@/constants/colors';
 import { getDailyGoalMessage } from '@/constants/dailyGoalMessages';
@@ -15,6 +16,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuickAddButtons } from '@/components/QuickAddButtons';
 import { ConfettiCelebration } from '@/components/ConfettiCelebration';
 import DailyBarChart from '@/components/DailyBarChart';
+import { apiRequest } from '@/lib/query-client';
 
 function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
   challenges: Challenge[];
@@ -71,6 +73,199 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
     </ScrollView>
   );
 }
+
+interface SquadMember {
+  userId: string;
+  displayName: string;
+  totalCount: number;
+  todayCount: number;
+  contributionPct: number;
+  pace: 'green' | 'yellow' | 'red';
+  memberTarget: number;
+}
+
+interface SquadProgress {
+  squadTotal: number;
+  collectiveTarget: number;
+  percentComplete: number;
+  remaining: number;
+  totalDays: number;
+  daysRemaining: number;
+  members: SquadMember[];
+  exerciseType: string;
+}
+
+function SquadPowerMeter({ squadProgress, colors, onSpark, userId }: {
+  squadProgress: SquadProgress;
+  colors: any;
+  onSpark: (memberId: string) => void;
+  userId?: string;
+}) {
+  const pct = Math.min(100, squadProgress.percentComplete);
+  const exerciseLabel = squadProgress.exerciseType.toLowerCase();
+
+  const paceIcon = (pace: string) => {
+    if (pace === 'green') return { name: 'ellipse' as const, color: '#4CAF50' };
+    if (pace === 'yellow') return { name: 'ellipse' as const, color: '#FFC107' };
+    return { name: 'ellipse' as const, color: '#F44336' };
+  };
+
+  return (
+    <View style={squadStyles.container}>
+      <View style={[squadStyles.meterCard, { backgroundColor: colors.card }]}>
+        <View style={squadStyles.meterHeader}>
+          <Ionicons name="flash" size={20} color="#9C27B0" />
+          <Text style={[squadStyles.meterTitle, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+            Squad Power
+          </Text>
+          <Text style={[squadStyles.meterPct, { color: '#9C27B0', fontFamily: 'Inter_700Bold' }]}>
+            {pct}%
+          </Text>
+        </View>
+
+        <View style={[squadStyles.meterTrack, { backgroundColor: colors.progressBackground }]}>
+          <LinearGradient
+            colors={['#9C27B0', '#E040FB']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[squadStyles.meterFill, { width: `${pct}%` }]}
+          />
+        </View>
+
+        <Text style={[squadStyles.meterSubtext, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+          {pct >= 100
+            ? `Goal reached! ${squadProgress.squadTotal.toLocaleString()} ${exerciseLabel} completed!`
+            : `Squad is at ${pct}%! Only ${squadProgress.remaining.toLocaleString()} ${exerciseLabel} to the finish line!`}
+        </Text>
+
+        <View style={squadStyles.meterStats}>
+          <View style={squadStyles.meterStat}>
+            <Text style={[squadStyles.meterStatValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {squadProgress.squadTotal.toLocaleString()}
+            </Text>
+            <Text style={[squadStyles.meterStatLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Completed
+            </Text>
+          </View>
+          <View style={[squadStyles.meterStatDivider, { backgroundColor: colors.border }]} />
+          <View style={squadStyles.meterStat}>
+            <Text style={[squadStyles.meterStatValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {squadProgress.collectiveTarget.toLocaleString()}
+            </Text>
+            <Text style={[squadStyles.meterStatLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Target
+            </Text>
+          </View>
+          <View style={[squadStyles.meterStatDivider, { backgroundColor: colors.border }]} />
+          <View style={squadStyles.meterStat}>
+            <Text style={[squadStyles.meterStatValue, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+              {squadProgress.daysRemaining}
+            </Text>
+            <Text style={[squadStyles.meterStatLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+              Days Left
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <Text style={[squadStyles.sectionTitle, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+        Contributions
+      </Text>
+
+      {squadProgress.members.map((member) => {
+        const isMe = member.userId === userId;
+        const pace = paceIcon(member.pace);
+        return (
+          <View
+            key={member.userId}
+            style={[
+              squadStyles.memberRow,
+              {
+                backgroundColor: isMe ? '#9C27B020' : colors.card,
+                borderColor: isMe ? '#9C27B040' : colors.border,
+              },
+            ]}
+          >
+            <Ionicons name={pace.name} size={10} color={pace.color} style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[squadStyles.memberName, { color: colors.text, fontFamily: 'Inter_600SemiBold' }]}>
+                {member.displayName}{isMe ? ' (You)' : ''}
+              </Text>
+              <View style={[squadStyles.memberBar, { backgroundColor: colors.progressBackground }]}>
+                <View
+                  style={[
+                    squadStyles.memberBarFill,
+                    {
+                      width: `${Math.min(100, member.contributionPct)}%`,
+                      backgroundColor: pace.color,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <View style={squadStyles.memberStats}>
+              <Text style={[squadStyles.memberCount, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                {member.totalCount.toLocaleString()}
+              </Text>
+              <Text style={[squadStyles.memberPct, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                {member.contributionPct}%
+              </Text>
+            </View>
+            {member.pace === 'red' && !isMe && (
+              <Pressable
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  onSpark(member.userId);
+                }}
+                style={[squadStyles.sparkButton, { backgroundColor: '#FFC10720' }]}
+              >
+                <Ionicons name="flash" size={16} color="#FFC107" />
+              </Pressable>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const squadStyles = StyleSheet.create({
+  container: { gap: 12, marginTop: 8 },
+  meterCard: { borderRadius: 16, padding: 16 },
+  meterHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  meterTitle: { fontSize: 17, flex: 1 },
+  meterPct: { fontSize: 22 },
+  meterTrack: { height: 14, borderRadius: 7, overflow: 'hidden' },
+  meterFill: { height: '100%', borderRadius: 7 },
+  meterSubtext: { fontSize: 14, marginTop: 10, textAlign: 'center' },
+  meterStats: { flexDirection: 'row', marginTop: 16, justifyContent: 'space-around' },
+  meterStat: { alignItems: 'center' },
+  meterStatValue: { fontSize: 18 },
+  meterStatLabel: { fontSize: 11, marginTop: 2 },
+  meterStatDivider: { width: 1, height: 30 },
+  sectionTitle: { fontSize: 15, marginTop: 4 },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  memberName: { fontSize: 14, marginBottom: 4 },
+  memberBar: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  memberBarFill: { height: '100%', borderRadius: 3 },
+  memberStats: { alignItems: 'flex-end', marginLeft: 10 },
+  memberCount: { fontSize: 15 },
+  memberPct: { fontSize: 11, marginTop: 1 },
+  sparkButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+});
 
 function AchievementModal({ visible, onComplete, onKeepGoing, onDelete, colors, exerciseLabel, totalCompleted, goalValue }: {
   visible: boolean;
@@ -255,12 +450,31 @@ export default function TodayScreen() {
   } = usePushups();
   const { user } = useAuth();
 
+  const isCollective = activeChallenge?.goalType === 'collective';
+  const [viewMode, setViewMode] = useState<'personal' | 'squad'>('personal');
+
+  useEffect(() => {
+    if (isCollective) {
+      setViewMode('squad');
+    } else {
+      setViewMode('personal');
+    }
+  }, [activeChallengeId, isCollective]);
+
+  const { data: squadProgress, refetch: refetchSquad } = useQuery<SquadProgress>({
+    queryKey: ['/api/groups', activeChallenge?.id, 'squad-progress'],
+    enabled: isCollective && viewMode === 'squad' && !!activeChallenge?.id,
+  });
+
   useFocusEffect(
     useCallback(() => {
       refresh();
       syncHealthKit();
-    }, [refresh, syncHealthKit])
+      if (isCollective) refetchSquad();
+    }, [refresh, syncHealthKit, isCollective, refetchSquad])
   );
+
+  const [seenMilestones, setSeenMilestones] = useState<Set<number>>(new Set());
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [showDailyGoalModal, setShowDailyGoalModal] = useState(false);
@@ -310,6 +524,21 @@ export default function TodayScreen() {
 
     prevPercentRef.current = currentPercent;
   }, [progress?.percentComplete, activeChallenge]);
+
+  useEffect(() => {
+    if (!isCollective || !squadProgress) return;
+    const pct = squadProgress.percentComplete;
+    const milestones = [25, 50, 75, 100];
+    for (const m of milestones) {
+      if (pct >= m && !seenMilestones.has(m)) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowConfetti(true);
+        setSeenMilestones(prev => new Set([...prev, m]));
+        setTimeout(() => setShowConfetti(false), 3000);
+        break;
+      }
+    }
+  }, [squadProgress?.percentComplete, isCollective, seenMilestones]);
 
   const currentCount = localCount ?? serverTodayCount;
   const hasUnsavedChanges = localCount !== null && localCount !== savedCount;
@@ -372,6 +601,8 @@ export default function TodayScreen() {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     await updateLog(today, localCount);
     setSavedCount(localCount);
+
+    if (isCollective) refetchSquad();
 
     const target = progress?.dynamicDailyTarget || 0;
     if (target > 0 && localCount >= target) {
@@ -540,25 +771,69 @@ export default function TodayScreen() {
           colors={colors}
         />
 
-        <View style={styles.progressSection}>
-          <ProgressRing
-            progress={Math.min(100, progress?.percentComplete || 0)}
-            size={200}
-            strokeWidth={16}
-            progressColor={colors.tint}
-            backgroundColor={colors.progressBackground}
-          >
-            <Text style={[styles.progressPercent, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
-              {Math.min(100, Math.round(progress?.percentComplete || 0))}%
+        {isCollective && (
+          <View style={[styles.viewToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable
+              onPress={() => setViewMode('personal')}
+              style={[
+                styles.viewToggleOption,
+                viewMode === 'personal' && { backgroundColor: colors.tint },
+              ]}
+            >
+              <Ionicons name="person" size={14} color={viewMode === 'personal' ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.viewToggleText, { color: viewMode === 'personal' ? '#fff' : colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
+                Personal
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setViewMode('squad')}
+              style={[
+                styles.viewToggleOption,
+                viewMode === 'squad' && { backgroundColor: '#9C27B0' },
+              ]}
+            >
+              <Ionicons name="flash" size={14} color={viewMode === 'squad' ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.viewToggleText, { color: viewMode === 'squad' ? '#fff' : colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
+                Squad
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {isCollective && viewMode === 'squad' && squadProgress && (
+          <SquadPowerMeter
+            squadProgress={squadProgress}
+            colors={colors}
+            userId={user?.id}
+            onSpark={async (memberId) => {
+              try {
+                await apiRequest('POST', `/api/groups/${activeChallenge.id}/spark`, { targetUserId: memberId });
+              } catch {}
+            }}
+          />
+        )}
+
+        {viewMode === 'personal' && (
+          <View style={styles.progressSection}>
+            <ProgressRing
+              progress={Math.min(100, progress?.percentComplete || 0)}
+              size={200}
+              strokeWidth={16}
+              progressColor={colors.tint}
+              backgroundColor={colors.progressBackground}
+            >
+              <Text style={[styles.progressPercent, { color: colors.text, fontFamily: 'Inter_700Bold' }]}>
+                {Math.min(100, Math.round(progress?.percentComplete || 0))}%
+              </Text>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
+                of goal
+              </Text>
+            </ProgressRing>
+            <Text style={[styles.totalProgress, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
+              {progress?.totalCompleted.toLocaleString()} / {goalValue.toLocaleString()} {exerciseLabel}
             </Text>
-            <Text style={[styles.progressLabel, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-              of goal
-            </Text>
-          </ProgressRing>
-          <Text style={[styles.totalProgress, { color: colors.textSecondary, fontFamily: 'Inter_500Medium' }]}>
-            {progress?.totalCompleted.toLocaleString()} / {goalValue.toLocaleString()} {exerciseLabel}
-          </Text>
-        </View>
+          </View>
+        )}
 
         {showDailyTarget && (
           <View style={[styles.dailyCard, { backgroundColor: colors.card }]}>
@@ -1090,6 +1365,25 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   counterHint: {
+    fontSize: 13,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    gap: 4,
+  },
+  viewToggleOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  viewToggleText: {
     fontSize: 13,
   },
 });

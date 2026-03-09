@@ -67,7 +67,7 @@ export default function GroupsScreen() {
   const [groupGoal, setGroupGoal] = useState('');
   const [exerciseType, setExerciseType] = useState('Push-ups');
   const [customExercise, setCustomExercise] = useState('');
-  const [goalType, setGoalType] = useState<'group' | 'individual'>('group');
+  const [goalType, setGoalType] = useState<'group' | 'individual' | 'collective'>('group');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [createError, setCreateError] = useState('');
@@ -100,7 +100,7 @@ export default function GroupsScreen() {
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: async (data: { name: string; exerciseType: string; goalType: string; totalGoal: number; startDate: string; endDate: string }) => {
+    mutationFn: async (data: { name: string; exerciseType: string; goalType: string; totalGoal: number; collectiveTarget?: number; startDate: string; endDate: string }) => {
       const res = await apiRequest("POST", "/api/groups", data);
       return res.json();
     },
@@ -207,6 +207,7 @@ export default function GroupsScreen() {
       exerciseType: effectiveExerciseType,
       goalType,
       totalGoal: goalType === 'individual' ? 0 : goal,
+      collectiveTarget: goalType === 'collective' ? goal : undefined,
       startDate: sd,
       endDate: ed,
     });
@@ -275,6 +276,8 @@ export default function GroupsScreen() {
     const isOwner = group.createdBy === user?.id;
     const goalDisplay = group.goalType === 'individual'
       ? (group.myIndividualGoal ? `${group.myIndividualGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}` : 'Set your goal')
+      : group.goalType === 'collective'
+      ? `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)} (squad)`
       : `${group.totalGoal.toLocaleString()} ${getExerciseUnit(group.exerciseType)}`;
     return (
       <TouchableOpacity
@@ -487,7 +490,7 @@ export default function GroupsScreen() {
       )}
 
       <Text style={[styles.label, { color: colors.textSecondary }]}>GOAL TYPE</Text>
-      <View style={styles.goalTypeRow}>
+      <View style={[styles.goalTypeRow, { flexWrap: 'wrap' }]}>
         <TouchableOpacity
           style={[
             styles.goalTypeChip,
@@ -506,6 +509,20 @@ export default function GroupsScreen() {
           style={[
             styles.goalTypeChip,
             { borderColor: colors.border },
+            goalType === 'collective' && { backgroundColor: '#9C27B0', borderColor: '#9C27B0' },
+          ]}
+          onPress={() => setGoalType('collective')}
+        >
+          <Ionicons name="flash" size={16} color={goalType === 'collective' ? '#fff' : colors.text} />
+          <Text style={[
+            styles.goalTypeText,
+            { color: goalType === 'collective' ? '#fff' : colors.text },
+          ]}>Collective</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.goalTypeChip,
+            { borderColor: colors.border },
             goalType === 'individual' && { backgroundColor: colors.tint, borderColor: colors.tint },
           ]}
           onPress={() => setGoalType('individual')}
@@ -514,22 +531,26 @@ export default function GroupsScreen() {
           <Text style={[
             styles.goalTypeText,
             { color: goalType === 'individual' ? '#fff' : colors.text },
-          ]}>Individual Goals</Text>
+          ]}>Individual</Text>
         </TouchableOpacity>
       </View>
       <Text style={[styles.goalTypeHint, { color: colors.textSecondary }]}>
         {goalType === 'group'
           ? 'Everyone works toward the same shared goal'
+          : goalType === 'collective'
+          ? 'All contributions feed into one shared squad target'
           : 'Each member sets their own personal goal'}
       </Text>
 
-      {goalType === 'group' && (
+      {(goalType === 'group' || goalType === 'collective') && (
         <>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL GOAL ({effectiveExerciseType.toUpperCase()})</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {goalType === 'collective' ? 'SQUAD TARGET' : 'TOTAL GOAL'} ({effectiveExerciseType.toUpperCase()})
+          </Text>
           <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="e.g., 1000"
+              placeholder={goalType === 'collective' ? "e.g., 50000 (total for squad)" : "e.g., 1000"}
               placeholderTextColor={colors.textSecondary}
               value={groupGoal}
               onChangeText={setGroupGoal}
@@ -553,6 +574,11 @@ export default function GroupsScreen() {
           {goalType === 'group' && parseInt(groupGoal) > 0 && (
             <Text style={[styles.summaryTarget, { color: colors.tint }]}>
               ~{Math.ceil(parseInt(groupGoal) / (differenceInCalendarDays(calEndDate, calStartDate) + 1))} {getExerciseUnit(effectiveExerciseType)}/day per member
+            </Text>
+          )}
+          {goalType === 'collective' && parseInt(groupGoal) > 0 && (
+            <Text style={[styles.summaryTarget, { color: '#9C27B0' }]}>
+              Squad target: {parseInt(groupGoal).toLocaleString()} {getExerciseUnit(effectiveExerciseType)} total — all members contribute together
             </Text>
           )}
           {goalType === 'individual' && (

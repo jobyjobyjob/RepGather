@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, date, timestamp, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, date, timestamp, uniqueIndex, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -44,6 +44,8 @@ export const groups = pgTable("groups", {
   goalType: text("goal_type").notNull().default("group"),
   totalGoal: integer("total_goal").notNull(),
   originalTotalGoal: integer("original_total_goal"),
+  collectiveTarget: integer("collective_target"),
+  memberContributionTargets: jsonb("member_contribution_targets"),
   targetStyle: text("target_style").notNull().default("even"),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),

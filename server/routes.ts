@@ -214,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Group routes
   app.post("/api/groups", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { name, exerciseType, goalType, totalGoal, startDate, endDate } = req.body;
+      const { name, exerciseType, goalType, totalGoal, collectiveTarget, startDate, endDate } = req.body;
       if (!name || !startDate || !endDate) {
         return res.status(400).json({ message: "All fields are required" });
       }
@@ -226,6 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         exerciseType: exerciseType || "Push-ups",
         goalType: goalType || "group",
         totalGoal,
+        collectiveTarget: goalType === 'collective' ? (collectiveTarget || totalGoal) : undefined,
         startDate,
         endDate,
         isPersonal: false,
@@ -299,6 +300,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leaderboard);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to get leaderboard" });
+    }
+  });
+
+  app.get("/api/groups/:id/squad-progress", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const progress = await storage.getSquadProgress(req.params.id as string);
+      if (!progress) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      res.json(progress);
+    } catch (error: any) {
+      console.error("Squad progress error:", error);
+      res.status(500).json({ message: "Failed to get squad progress" });
+    }
+  });
+
+  app.post("/api/groups/:id/spark", requireAuth, async (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, message: "Spark sent!" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to send spark" });
+    }
+  });
+
+  app.put("/api/groups/:id/member-targets", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { targets } = req.body;
+      if (!targets || typeof targets !== 'object') {
+        return res.status(400).json({ message: "Targets object is required" });
+      }
+      const updated = await storage.updateMemberTargets(req.params.id as string, req.session.userId!, targets);
+      if (!updated) {
+        return res.status(404).json({ message: "Group not found or not authorized" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update member targets error:", error);
+      res.status(500).json({ message: "Failed to update member targets" });
     }
   });
 

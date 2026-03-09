@@ -23,12 +23,14 @@ export default function EditChallengeScreen() {
 
   const [name, setName] = useState(challenge?.name || '');
   const [totalGoal, setTotalGoal] = useState(String(challenge?.totalGoal || ''));
+  const [collectiveTarget, setCollectiveTarget] = useState(String(challenge?.collectiveTarget || challenge?.totalGoal || ''));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (challenge) {
       setName(challenge.name);
       setTotalGoal(String(challenge.totalGoal));
+      setCollectiveTarget(String(challenge.collectiveTarget || challenge.totalGoal));
     }
   }, [challenge?.id]);
 
@@ -50,7 +52,9 @@ export default function EditChallengeScreen() {
   const isCompleted = challenge.status === 'completed';
   const isArchived = challenge.status === 'archived';
   const isActive = challenge.status === 'active';
-  const hasChanges = name !== challenge.name || totalGoal !== String(challenge.totalGoal);
+  const isCollective = challenge.goalType === 'collective';
+  const hasChanges = name !== challenge.name || totalGoal !== String(challenge.totalGoal) ||
+    (isCollective && collectiveTarget !== String(challenge.collectiveTarget || challenge.totalGoal));
 
   const handleSave = async () => {
     if (!hasChanges) return;
@@ -63,12 +67,14 @@ export default function EditChallengeScreen() {
       Alert.alert('Invalid Goal', 'Please enter a valid goal number.');
       return;
     }
+    const updates: any = { name: name.trim(), totalGoal: goalNum };
+    if (isCollective) {
+      const ct = parseInt(collectiveTarget, 10);
+      if (!isNaN(ct) && ct > 0) updates.collectiveTarget = ct;
+    }
     setSaving(true);
     try {
-      await updateChallenge(challenge.id, {
-        name: name.trim(),
-        totalGoal: goalNum,
-      });
+      await updateChallenge(challenge.id, updates);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e) {
@@ -221,6 +227,29 @@ export default function EditChallengeScreen() {
           keyboardType="number-pad"
           editable={isActive}
         />
+
+        {isCollective && (
+          <>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
+              Squad Target
+            </Text>
+            <TextInput
+              style={[styles.input, { 
+                backgroundColor: colors.card, 
+                color: colors.text, 
+                borderColor: '#9C27B0',
+                fontFamily: 'Inter_500Medium',
+                opacity: isActive ? 1 : 0.6,
+              }]}
+              value={collectiveTarget}
+              onChangeText={setCollectiveTarget}
+              placeholder="Squad collective target"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              editable={isActive}
+            />
+          </>
+        )}
 
         {isActive && hasChanges && (
           <Pressable

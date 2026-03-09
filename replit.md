@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Models
 - **Users**: id, username, displayName, password
-- **Groups**: id, name, inviteCode (6-char), exerciseType, goalType, totalGoal, originalTotalGoal, targetStyle, startDate, endDate, isPersonal, status, createdBy
+- **Groups**: id, name, inviteCode (6-char), exerciseType, goalType, totalGoal, originalTotalGoal, collectiveTarget, memberContributionTargets (jsonb), targetStyle, startDate, endDate, isPersonal, status, hasSeenCompletionModal, completedAt, createdBy
 - **GroupMembers**: id, groupId, userId, individualGoal, joinedAt
 - **DailyLogs**: id, userId, groupId, date, count (unique per user+group+date)
 
@@ -66,15 +66,27 @@ Preferred communication style: Simple, everyday language.
 - originalTotalGoal preserves initial goal value for debt detection
 - History calendar shows projected future daily targets below upcoming dates (in secondary text color), recalculated on each "Complete Day" save; simulates forward using Spread the Debt + mode multipliers
 
+### Collective / "Shared Fate" Challenges
+- Collective goalType: `goalType='collective'`, `collectiveTarget` stores shared squad target
+- `memberContributionTargets` is a JSON `Record<userId, number>` for per-member targets
+- All members' contributions feed into one shared squad target
+- Home screen shows Personal/Squad toggle for collective challenges
+- Squad view: Squad Power Meter (purple gradient progress bar), contribution feed with pace indicators (green/yellow/red)
+- Pace: green = on/ahead of pace, yellow = slightly behind, red = no activity today + behind
+- "Spark" button next to red-status members (haptic feedback nudge)
+- Milestone celebrations: confetti at 25%, 50%, 75%, 100% milestones (tracked per session)
+- Endpoints: GET /api/groups/:id/squad-progress, POST /api/groups/:id/spark, PUT /api/groups/:id/member-targets
+
 ### Groups Tab
 - Shows only non-personal (collaborative) groups
-- Create group, join group via invite code, view leaderboard
+- Create group with three goal types: Group Goal, Collective, Individual
+- Join group via invite code, view leaderboard
 - Group creator cannot leave; other members can leave
 
 ### API Endpoints
 - Auth: register, login, logout, me
 - Challenges: GET /api/challenges (all user challenges), POST /api/challenges/personal, DELETE /api/challenges/:id
-- Groups: POST /api/groups, POST /api/groups/join, GET /api/groups, GET /api/groups/:id/members, GET /api/groups/:id/leaderboard, PUT /api/groups/:id/individual-goal, DELETE /api/groups/:id/leave
+- Groups: POST /api/groups, POST /api/groups/join, GET /api/groups, GET /api/groups/:id/members, GET /api/groups/:id/leaderboard, PUT /api/groups/:id/individual-goal, DELETE /api/groups/:id/leave, GET /api/groups/:id/squad-progress, POST /api/groups/:id/spark, PUT /api/groups/:id/member-targets
 - Logs: POST /api/logs, PUT /api/logs, GET /api/logs/:groupId, DELETE /api/logs/:groupId/:date
 
 ### Build System
@@ -102,6 +114,13 @@ Preferred communication style: Simple, everyday language.
 - **Auth**: express-session, connect-pg-simple
 
 ## Recent Changes
+- 2026-03-09: "Shared Fate" collective squad challenge system: goalType='collective', collectiveTarget field, Squad Power Meter on home screen with purple gradient, contribution feed with green/yellow/red pace indicators, Spark nudge button
+- 2026-03-09: Personal/Squad segmented toggle on home screen for collective challenges; squad view replaces ProgressRing with Squad Power Meter
+- 2026-03-09: Squad milestone celebrations: confetti at 25/50/75/100% (tracked in-memory per session)
+- 2026-03-09: Group creation supports 3 goal types: Group Goal, Collective, Individual
+- 2026-03-09: Server endpoints: GET /api/groups/:id/squad-progress, POST /api/groups/:id/spark, PUT /api/groups/:id/member-targets
+- 2026-03-09: Edit Challenge screen supports collectiveTarget editing for collective challenges
+- 2026-03-09: Metro config updated with blockList to prevent ENOENT crashes from workflow-logs directory
 - 2026-03-01: Daily goal celebration popup: when user saves a day meeting/exceeding the daily target, a modal with motivational message appears. Messages stored in constants/dailyGoalMessages.ts (10 messages, rotates by day of year)
 - 2026-03-01: DailyBarChart updated to show full challenge period (scrollable horizontally); future days show dashed outline target bars, past days show solid orange actual bars; auto-scrolls to today
 - 2026-03-01: Apple HealthKit integration: services/healthSync.ts service, Settings "APPLE HEALTH" control center (toggle, manual sync, fix permissions), auto-sync on home screen focus for walking challenges; requires dev build for native testing
