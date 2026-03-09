@@ -251,7 +251,7 @@ export default function TodayScreen() {
   const {
     isLoading, challenges, activeChallengeId, activeChallenge,
     logs, progress, logActivity, updateLog, setActiveChallenge,
-    deleteChallenge, completeChallenge, refresh, syncHealthKit,
+    deleteChallenge, completeChallenge, updateChallenge, refresh, syncHealthKit,
   } = usePushups();
   const { user } = useAuth();
 
@@ -265,7 +265,6 @@ export default function TodayScreen() {
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [showDailyGoalModal, setShowDailyGoalModal] = useState(false);
   const [dailyGoalMessage, setDailyGoalMessage] = useState('');
-  const [goalCelebrated, setGoalCelebrated] = useState(false);
   const prevPercentRef = useRef<number>(0);
   const [localCount, setLocalCount] = useState<number | null>(null);
   const [savedCount, setSavedCount] = useState<number | null>(null);
@@ -286,7 +285,6 @@ export default function TodayScreen() {
 
   useEffect(() => {
     challengeSwitchRef.current = true;
-    setGoalCelebrated(false);
     prevPercentRef.current = 0;
     setLocalCount(null);
     setSavedCount(null);
@@ -302,16 +300,16 @@ export default function TodayScreen() {
     }
 
     const prevPercent = prevPercentRef.current;
+    const alreadySeen = activeChallenge?.hasSeenCompletionModal === true;
 
-    if (currentPercent >= 100 && prevPercent < 100 && !goalCelebrated && activeChallenge) {
+    if (currentPercent >= 100 && prevPercent < 100 && !alreadySeen && activeChallenge) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowConfetti(true);
       setShowAchievementModal(true);
-      setGoalCelebrated(true);
     }
 
     prevPercentRef.current = currentPercent;
-  }, [progress?.percentComplete, goalCelebrated, activeChallenge]);
+  }, [progress?.percentComplete, activeChallenge]);
 
   const currentCount = localCount ?? serverTodayCount;
   const hasUnsavedChanges = localCount !== null && localCount !== savedCount;
@@ -396,13 +394,17 @@ export default function TodayScreen() {
     setShowAchievementModal(false);
     setShowConfetti(false);
     if (activeChallenge) {
+      await updateChallenge(activeChallenge.id, { hasSeenCompletionModal: true });
       await completeChallenge(activeChallenge.id);
     }
   };
 
-  const handleKeepGoing = () => {
+  const handleKeepGoing = async () => {
     setShowAchievementModal(false);
     setShowConfetti(false);
+    if (activeChallenge) {
+      await updateChallenge(activeChallenge.id, { hasSeenCompletionModal: true });
+    }
   };
 
   const handleDeleteChallenge = () => {
@@ -485,7 +487,7 @@ export default function TodayScreen() {
           </View>
 
           <ChallengePicker
-            challenges={challenges}
+            challenges={challenges.filter(c => c.status === 'active')}
             activeChallengeId={null}
             onSelect={handleChallengeSelect}
             colors={colors}
@@ -532,7 +534,7 @@ export default function TodayScreen() {
         </View>
 
         <ChallengePicker
-          challenges={challenges}
+          challenges={challenges.filter(c => c.status === 'active')}
           activeChallengeId={activeChallengeId}
           onSelect={handleChallengeSelect}
           colors={colors}

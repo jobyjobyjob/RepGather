@@ -42,6 +42,7 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
     >
       {challenges.map((challenge) => {
         const isActive = challenge.id === activeChallengeId;
+        const isArchived = challenge.status === 'archived' || challenge.status === 'completed';
         return (
           <Pressable
             key={challenge.id}
@@ -54,11 +55,12 @@ function ChallengePicker({ challenges, activeChallengeId, onSelect, colors }: {
               {
                 backgroundColor: isActive ? colors.tint : colors.card,
                 borderColor: isActive ? colors.tint : colors.border,
+                opacity: isArchived && !isActive ? 0.65 : 1,
               },
             ]}
           >
             <Ionicons
-              name={challenge.isPersonal ? "person" : "people"}
+              name={isArchived ? "archive" : (challenge.isPersonal ? "person" : "people")}
               size={14}
               color={isActive ? '#FFFFFF' : colors.textSecondary}
             />

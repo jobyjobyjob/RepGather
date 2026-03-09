@@ -28,6 +28,8 @@ export interface Challenge {
   inviteCode: string;
   isPersonal: boolean;
   status?: string;
+  hasSeenCompletionModal?: boolean;
+  completedAt?: string | null;
   createdBy: string;
   myIndividualGoal?: number | null;
 }
@@ -65,6 +67,7 @@ interface PushupContextValue {
   createPersonalChallenge: (data: { name: string; exerciseType: string; totalGoal: number; startDate: string; endDate: string }) => Promise<Challenge>;
   deleteChallenge: (challengeId: string) => Promise<void>;
   completeChallenge: (challengeId: string) => Promise<void>;
+  updateChallenge: (challengeId: string, updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }) => Promise<void>;
   syncHealthKit: () => Promise<{ synced: boolean; steps?: number }>;
 }
 
@@ -344,6 +347,19 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
   }, [fetchChallenges]);
 
+  const updateChallengeAction = useCallback(async (
+    challengeId: string,
+    updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }
+  ) => {
+    await apiRequest("PATCH", `/api/challenges/${challengeId}`, updates);
+    await fetchChallenges();
+    if (activeChallengeId === challengeId) {
+      await fetchLogs(challengeId);
+    }
+    queryClient.invalidateQueries({ queryKey: ['/api/challenges'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/groups'] });
+  }, [activeChallengeId, fetchChallenges, fetchLogs]);
+
   const syncHealthKit = useCallback(async (): Promise<{ synced: boolean; steps?: number }> => {
     if (Platform.OS !== 'ios') return { synced: false };
     if (!activeChallenge) return { synced: false };
@@ -394,8 +410,9 @@ export function PushupProvider({ children }: { children: ReactNode }) {
     createPersonalChallenge,
     deleteChallenge: deleteChallengeAction,
     completeChallenge: completeChallengeAction,
+    updateChallenge: updateChallengeAction,
     syncHealthKit,
-  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction, completeChallengeAction, syncHealthKit]);
+  }), [isLoading, challenges, activeChallengeId, activeChallenge, logs, progress, setActiveChallenge, logActivity, updateLog, deleteLog, refresh, createPersonalChallenge, deleteChallengeAction, completeChallengeAction, updateChallengeAction, syncHealthKit]);
 
   return (
     <PushupContext.Provider value={value}>

@@ -1,0 +1,58 @@
+To implement the challenge lifecycle (Edit, Archive, and Ghosting prevention) using your existing Drizzle and Expo stack, copy and paste the following instructions into your Replit agent or editor.
+Objective: Implement Challenge Lifecycle Management
+Update the RepGather app to allow editing of active challenges, prevent completed challenges from cluttering the Home Screen, and stop recurring "congratulations" popups.
+Step 1: Update Database Schema
+Update shared/schema.ts to include a status field and a flag to track if the completion message has been shown.
+Instructions for Replit:
+Modify the groups table in shared/schema.ts to include:
+ * status: A text field (defaulting to 'active'). Valid values: 'active', 'archived'.
+ * hasSeenCompletionModal: A boolean field (defaulting to false).
+ * completedAt: A nullable timestamp.
+<!-- end list -->
+// shared/schema.ts update
+export const groups = pgTable("groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  // ... existing fields ...
+  status: text("status").notNull().default("active"),
+  hasSeenCompletionModal: boolean("has_seen_completion_modal").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+});
+
+Step 2: Update Server Logic
+Update server/storage.ts and server/routes.ts to handle archiving and status updates.
+Instructions for Replit:
+ * In server/storage.ts, add functions to updateGroup and archiveGroup.
+ * In server/routes.ts, create a PATCH /api/groups/:id endpoint that allows updating name, totalGoal, status, and hasSeenCompletionModal.
+Step 3: Frontend - Filter Home Screen
+Update app/(tabs)/index.tsx to only display challenges that are currently "Active."
+Instructions for Replit:
+Update the main query in app/(tabs)/index.tsx. Filter the fetched groups so that the Home Screen only renders items where group.status === 'active'.
+Step 4: Fix the "Ghosting" Popup Logic
+Modify the logic that triggers the "Congratulations" modal.
+Instructions for Replit:
+In the component handling the progress popup (likely app/(tabs)/index.tsx or a dedicated component):
+ * Only show the modal if progress >= goal AND group.hasSeenCompletionModal === false.
+ * When the user clicks "Dismiss" or "Save" on the modal, trigger an API call to set hasSeenCompletionModal to true.
+ * If the user chooses to "Complete and Save," trigger an API call to set status to 'archived'.
+Step 5: Add Edit Challenge UI
+Create a new screen or modal app/edit-challenge.tsx to allow users to modify their goals.
+Instructions for Replit:
+ * Create app/edit-challenge.tsx.
+ * Use a form to allow users to edit the name and totalGoal.
+ * Add an "Archive Challenge" button at the bottom of the edit screen which sets the status to 'archived'.
+ * Link to this screen from the challenge cards on the Home Screen using a "Gear" icon.
+Step 6: Update History Screen
+Update app/(tabs)/history.tsx to show the "Saved" data.
+Instructions for Replit:
+Modify the query in app/(tabs)/history.tsx to display all groups where status === 'archived'. This ensures users can still see their February stats without them appearing on the Home Screen.
+Step 7: Final Migration
+Instructions for Replit:
+Run the Drizzle migration to apply the schema changes:
+npx drizzle-kit push:pg
+
+Summary of Changes for the User:
+ * Home Screen: Only shows what you are currently working on.
+ * Popups: The "Congrats" message will now only appear once per challenge.
+ * Archive: Completed challenges move to the History tab automatically when you select "Save."
+ * Edit: You can now change your goals if they were set too high or low.

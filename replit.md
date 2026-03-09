@@ -107,6 +107,12 @@ Preferred communication style: Simple, everyday language.
 - 2026-03-01: Apple HealthKit integration: services/healthSync.ts service, Settings "APPLE HEALTH" control center (toggle, manual sync, fix permissions), auto-sync on home screen focus for walking challenges; requires dev build for native testing
 - 2026-03-01: Added "Walking (steps)" exercise type to EXERCISE_TYPES; HealthKit-enabled exercises auto-sync step count when HealthKit is enabled
 - 2026-03-01: Fixed challenge completion: "Save" button no longer deletes challenge; completed challenges remain visible in challenge list with status "completed"
+- 2026-03-09: Challenge lifecycle: Edit Challenge screen (app/edit-challenge.tsx) — edit name, goal; archive, reactivate, delete challenges
+- 2026-03-09: PATCH /api/challenges/:id endpoint for updating challenge name, goal, status, hasSeenCompletionModal
+- 2026-03-09: hasSeenCompletionModal + completedAt fields added to groups schema — prevents congratulations popup re-showing
+- 2026-03-09: Home screen challenge picker filters to active-only challenges; History tab shows all (including archived)
+- 2026-03-09: Settings tab separates active vs archived/completed challenges; edit (pencil) and delete icons per challenge
+- 2026-03-09: CORS updated to allow PATCH method
 - 2026-02-11: Fixed streak counter: now starts from yesterday if today has no entry; useFocusEffect on Home/History tabs ensures logs refresh after edits
 - 2026-02-09: Migrated database to external Neon PostgreSQL (user-owned account); EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
 - 2026-02-09: Swipe-left-to-delete gesture for challenges in Settings tab using PanResponder

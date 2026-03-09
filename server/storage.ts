@@ -269,8 +269,46 @@ export async function completeChallenge(groupId: string, userId: string): Promis
 
   await db
     .update(groups)
-    .set({ status: "completed" })
+    .set({ status: "completed", completedAt: new Date() })
     .where(eq(groups.id, groupId));
+}
+
+export async function updateChallenge(
+  groupId: string,
+  userId: string,
+  updates: { name?: string; totalGoal?: number; status?: string; hasSeenCompletionModal?: boolean }
+): Promise<Group | null> {
+  const group = await getGroup(groupId);
+  if (!group) return null;
+  if (group.createdBy !== userId) return null;
+
+  const setData: any = {};
+  if (updates.name !== undefined) setData.name = updates.name;
+  if (updates.totalGoal !== undefined) {
+    setData.totalGoal = updates.totalGoal;
+    if (!group.originalTotalGoal) {
+      setData.originalTotalGoal = group.totalGoal;
+    }
+  }
+  if (updates.status !== undefined) {
+    setData.status = updates.status;
+    if (updates.status === 'archived' || updates.status === 'completed') {
+      setData.completedAt = new Date();
+    }
+  }
+  if (updates.hasSeenCompletionModal !== undefined) {
+    setData.hasSeenCompletionModal = updates.hasSeenCompletionModal;
+  }
+
+  if (Object.keys(setData).length === 0) return group;
+
+  const [updated] = await db
+    .update(groups)
+    .set(setData)
+    .where(eq(groups.id, groupId))
+    .returning();
+
+  return updated || group;
 }
 
 export async function deleteUser(userId: string): Promise<void> {

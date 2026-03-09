@@ -182,6 +182,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/challenges/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { name, totalGoal, status, hasSeenCompletionModal } = req.body;
+      const updated = await storage.updateChallenge(
+        req.params.id as string,
+        req.session.userId!,
+        { name, totalGoal, status, hasSeenCompletionModal }
+      );
+      if (!updated) {
+        return res.status(404).json({ message: "Challenge not found or not authorized" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update challenge error:", error);
+      res.status(500).json({ message: "Failed to update challenge" });
+    }
+  });
+
   // Delete a challenge (personal only, or group if creator)
   app.delete("/api/challenges/:id", requireAuth, async (req: Request, res: Response) => {
     try {

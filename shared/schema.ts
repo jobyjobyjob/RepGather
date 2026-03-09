@@ -49,6 +49,8 @@ export const groups = pgTable("groups", {
   endDate: date("end_date").notNull(),
   isPersonal: boolean("is_personal").notNull().default(false),
   status: text("status").notNull().default("active"),
+  hasSeenCompletionModal: boolean("has_seen_completion_modal").notNull().default(false),
+  completedAt: timestamp("completed_at"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

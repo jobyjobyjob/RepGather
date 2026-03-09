@@ -19,6 +19,10 @@ function ChallengeRow({ challenge, onDelete, colors, isActive, onActivate }: {
   isActive: boolean;
   onActivate: (id: string) => void;
 }) {
+  const isCompleted = challenge.status === 'completed';
+  const isArchived = challenge.status === 'archived';
+  const statusColor = isCompleted ? '#4CAF50' : isArchived ? '#9E9E9E' : colors.tint;
+
   return (
     <View style={[
       styles.challengeRow,
@@ -26,6 +30,7 @@ function ChallengeRow({ challenge, onDelete, colors, isActive, onActivate }: {
         backgroundColor: isActive ? colors.tint + '10' : colors.card,
         borderColor: isActive ? colors.tint + '30' : 'transparent',
         borderWidth: isActive ? 1 : 0,
+        opacity: isArchived ? 0.7 : 1,
       },
     ]}>
       <Pressable
@@ -47,12 +52,32 @@ function ChallengeRow({ challenge, onDelete, colors, isActive, onActivate }: {
             {challenge.exerciseType} · {challenge.totalGoal.toLocaleString()} total
           </Text>
         </View>
-        {isActive && (
+        {isActive && challenge.status === 'active' && (
           <View style={[styles.activeBadge, { backgroundColor: colors.tint + '20' }]}>
             <Ionicons name="radio-button-on" size={10} color={colors.tint} />
             <Text style={[styles.activeBadgeText, { color: colors.tint }]}>Active</Text>
           </View>
         )}
+        {(isCompleted || isArchived) && (
+          <View style={[styles.activeBadge, { backgroundColor: statusColor + '20' }]}>
+            <Ionicons name={isCompleted ? "checkmark-circle" : "archive"} size={10} color={statusColor} />
+            <Text style={[styles.activeBadgeText, { color: statusColor }]}>
+              {isCompleted ? 'Done' : 'Archived'}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+      <Pressable
+        onPress={() => router.push({ pathname: '/edit-challenge', params: { id: challenge.id } })}
+        hitSlop={8}
+        testID={`edit-challenge-${challenge.id}`}
+        accessibilityLabel="Edit challenge"
+        style={({ pressed }) => [
+          styles.deleteIconBtn,
+          { backgroundColor: pressed ? colors.tint + '25' : colors.tint + '12', marginRight: 6 },
+        ]}
+      >
+        <Ionicons name="create-outline" size={18} color={colors.tint} />
       </Pressable>
       <Pressable
         onPress={() => onDelete(challenge.id, challenge.name)}
@@ -278,8 +303,10 @@ export default function SettingsScreen() {
     );
   }
 
-  const groupChallenges = challenges.filter(c => !c.isPersonal);
-  const personalChallenges = challenges.filter(c => c.isPersonal);
+  const activeChallenges = challenges.filter(c => c.status === 'active');
+  const archivedChallenges = challenges.filter(c => c.status === 'archived' || c.status === 'completed');
+  const groupChallenges = activeChallenges.filter(c => !c.isPersonal);
+  const personalChallenges = activeChallenges.filter(c => c.isPersonal);
 
   const renderProfileSection = () => {
     if (showProfile) {
@@ -418,7 +445,7 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: 'Inter_600SemiBold' }]}>
-              CHALLENGES ({challenges.length})
+              CHALLENGES ({activeChallenges.length})
             </Text>
             <Pressable
               onPress={() => router.push('/setup')}
@@ -473,8 +500,26 @@ export default function SettingsScreen() {
                 </>
               )}
               <Text style={[styles.challengeHint, { color: colors.textSecondary, fontFamily: 'Inter_400Regular' }]}>
-                Tap to activate
+                Tap to activate · Pencil to edit
               </Text>
+            </>
+          )}
+
+          {archivedChallenges.length > 0 && (
+            <>
+              <Text style={[styles.subSectionTitle, { color: colors.textSecondary, marginTop: 16 }]}>
+                Archived / Completed
+              </Text>
+              {archivedChallenges.map((challenge) => (
+                <ChallengeRow
+                  key={challenge.id}
+                  challenge={challenge}
+                  onDelete={handleDeleteChallenge}
+                  colors={colors}
+                  isActive={activeChallengeId === challenge.id}
+                  onActivate={handleActivate}
+                />
+              ))}
             </>
           )}
         </View>
